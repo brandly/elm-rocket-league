@@ -149,6 +149,7 @@ initialWorld =
         |> World.withGravity moonGravity Direction3d.negativeZ
         |> World.add floor
         |> addBoxes
+        |> addCar
 
 
 materials : Array (Material.Uniform coordinates)
@@ -195,6 +196,17 @@ randomOffsets index =
         |> Tuple.first
 
 
+addCar : World (Scene3d.Entity BodyCoordinates) -> World (Scene3d.Entity BodyCoordinates)
+addCar =
+    let
+        body =
+            boxWithSize (Length.meters 1.5) Materials.aluminum
+    in
+    body
+        |> Body.moveTo (Point3d.meters 0 0 1)
+        |> World.add
+
+
 addBoxes : World (Scene3d.Entity BodyCoordinates) -> World (Scene3d.Entity BodyCoordinates)
 addBoxes world =
     let
@@ -212,71 +224,69 @@ addBoxes world =
 
         distance =
             1
+
+        coords : List ( Float, Float, Float )
+        coords =
+            List.map (\x -> List.map (\y -> List.map (\z -> ( x, y, z )) zDimensions) xyDimensions) xyDimensions
+                |> List.concat
+                |> List.concat
     in
     List.foldl
-        (\x world1 ->
-            List.foldl
-                (\y world2 ->
-                    List.foldl
-                        (\z ->
-                            let
-                                index =
-                                    round (z * xySize * xySize + y * xySize + x)
+        (\( x, y, z ) ->
+            let
+                index =
+                    round (z * xySize * xySize + y * xySize + x)
 
-                                material =
-                                    Array.get (index |> modBy (Array.length materials)) materials
-                                        |> Maybe.withDefault Materials.aluminum
+                material =
+                    Array.get (index |> modBy (Array.length materials)) materials
+                        |> Maybe.withDefault Materials.aluminum
 
-                                body =
-                                    if (index |> modBy 3) == 0 then
-                                        box material
+                body =
+                    if (index |> modBy 3) == 0 then
+                        box material
 
-                                    else
-                                        sphere (Material.uniform material)
+                    else
+                        sphere (Material.uniform material)
 
-                                offsets =
-                                    randomOffsets index
-                            in
-                            body
-                                |> Body.moveTo
-                                    (Point3d.meters
-                                        ((x - (xySize - 1) / 2) * distance + offsets.x)
-                                        ((y - (xySize - 1) / 2) * distance + offsets.y)
-                                        ((z + (2 * zSize + 1) / 2) * distance + offsets.z)
-                                    )
-                                |> World.add
-                        )
-                        world2
-                        zDimensions
-                )
-                world1
-                xyDimensions
+                offsets =
+                    randomOffsets index
+            in
+            body
+                |> Body.moveTo
+                    (Point3d.meters
+                        ((x - (xySize - 1) / 2) * distance + offsets.x)
+                        ((y - (xySize - 1) / 2) * distance + offsets.y)
+                        ((z + (2 * zSize + 1) / 2) * distance + offsets.z)
+                    )
+                |> World.add
         )
         world
-        xyDimensions
+        coords
 
 
-floorRadius : Length
-floorRadius =
+floorSize : Length
+floorSize =
     Length.meters 30
 
 
 floor : Body (Scene3d.Entity BodyCoordinates)
 floor =
     let
-        shape =
-            Sphere3d.atOrigin floorRadius
+        point x y =
+            Point3d.meters x y 0
+
+        size =
+            Length.inMeters floorSize
     in
-    Scene3d.sphere Scene3d.doesNotCastShadows
+    Scene3d.quad Scene3d.doesNotCastShadows
         (Material.uniform Materials.aluminum)
-        shape
-        |> Body.sphere shape
+        (point -size -size)
+        (point -size size)
+        (point size size)
+        (point size -size)
+        |> Body.plane
         |> Body.moveTo
-            (Point3d.meters
-                0
-                0
-                -(Length.inMeters floorRadius)
-            )
+            (Point3d.meters 0 0 0)
 
 
 boxSize : Length
@@ -284,16 +294,21 @@ boxSize =
     Length.meters 0.9
 
 
-box : Material.Uniform BodyCoordinates -> Body (Scene3d.Entity BodyCoordinates)
-box material =
+boxWithSize : Length -> Material.Uniform BodyCoordinates -> Body (Scene3d.Entity BodyCoordinates)
+boxWithSize size_ material =
     let
         shape =
             Block3d.centeredOn Frame3d.atOrigin
-                ( boxSize, boxSize, boxSize )
+                ( size_, size_, size_ )
     in
     Scene3d.block Scene3d.castsShadows material shape
         |> Body.block shape
         |> Body.withBehavior (Body.dynamic (Mass.kilograms 5))
+
+
+box : Material.Uniform BodyCoordinates -> Body (Scene3d.Entity BodyCoordinates)
+box =
+    boxWithSize boxSize
 
 
 sphereRadius : Length
