@@ -10,10 +10,12 @@ import Browser.Events as Events
 import Camera3d
 import Direction3d
 import Duration
+import Force
 import Frame3d
 import Html exposing (Html)
 import Html.Attributes
 import Illuminance
+import Json.Decode
 import Length exposing (Length, inMeters, meters)
 import Luminance
 import Mass
@@ -42,6 +44,11 @@ type alias Model =
 type Msg
     = Tick Float
     | Resize Float Float
+    | KeyDown Command
+
+
+type Command
+    = Jump
 
 
 main : Program () Model Msg
@@ -74,6 +81,21 @@ update msg model =
             , Cmd.none
             )
 
+        KeyDown Jump ->
+            ( { model
+                | world =
+                    World.update
+                        (\body ->
+                            body
+                                |> Body.applyForce (Force.newtons 300)
+                                    Direction3d.positiveZ
+                                    (Body.originPoint body)
+                        )
+                        model.world
+              }
+            , Cmd.none
+            )
+
         Resize width height ->
             ( { model | screenWidth = width, screenHeight = height }
             , Cmd.none
@@ -85,7 +107,24 @@ subscriptions _ =
     Sub.batch
         [ Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
         , Events.onAnimationFrameDelta Tick
+        , Events.onKeyDown (keyDecoder KeyDown)
+
+        --, Events.onKeyUp (keyDecoder KeyUp)
         ]
+
+
+keyDecoder : (Command -> Msg) -> Json.Decode.Decoder Msg
+keyDecoder toMsg =
+    Json.Decode.field "key" Json.Decode.string
+        |> Json.Decode.andThen
+            (\string ->
+                case string of
+                    " " ->
+                        Json.Decode.succeed (toMsg Jump)
+
+                    _ ->
+                        Json.Decode.fail ("Unrecognized key: " ++ string)
+            )
 
 
 view : Model -> Html Msg
@@ -199,11 +238,17 @@ randomOffsets index =
 addCar : World (Scene3d.Entity BodyCoordinates) -> World (Scene3d.Entity BodyCoordinates)
 addCar =
     let
+        shape =
+            Block3d.centeredOn Frame3d.atOrigin
+                ( Length.meters 3, Length.meters 5.26, Length.meters 2 )
+
         body =
-            boxWithSize (Length.meters 1.5) Materials.aluminum
+            Scene3d.block Scene3d.castsShadows Materials.gold shape
+                |> Body.block shape
+                |> Body.withBehavior (Body.dynamic (Mass.kilograms 5))
     in
     body
-        |> Body.moveTo (Point3d.meters 0 0 1)
+        |> Body.moveTo (Point3d.meters 0 0 3)
         |> World.add
 
 
@@ -266,7 +311,7 @@ addBoxes world =
 
 floorSize : Length
 floorSize =
-    Length.meters 30
+    Length.meters 150
 
 
 floor : Body (Scene3d.Entity BodyCoordinates)
