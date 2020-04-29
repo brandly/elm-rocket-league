@@ -36,6 +36,7 @@ import Viewpoint3d
 
 type alias Model =
     { world : World (Scene3d.Entity BodyCoordinates)
+    , rockets : Bool
     , screenWidth : Float
     , screenHeight : Float
     }
@@ -45,10 +46,12 @@ type Msg
     = Tick Float
     | Resize Float Float
     | KeyDown Command
+    | KeyUp Command
 
 
 type Command
     = Jump
+    | Rocket
 
 
 main : Program () Model Msg
@@ -64,6 +67,7 @@ main =
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { world = initialWorld
+      , rockets = False
       , screenWidth = 0
       , screenHeight = 0
       }
@@ -77,7 +81,23 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         Tick _ ->
-            ( { model | world = World.simulate (Duration.seconds (1 / 60)) model.world }
+            -- TODO: measure tick time instead of 1/60?
+            ( { model
+                | world =
+                    model.world
+                        |> World.update
+                            (\body ->
+                                if model.rockets then
+                                    body
+                                        |> Body.applyForce (Force.newtons 50000)
+                                            Direction3d.negativeY
+                                            (Body.originPoint body)
+
+                                else
+                                    body
+                            )
+                        |> World.simulate (Duration.seconds (1 / 60))
+              }
             , Cmd.none
             )
 
@@ -87,7 +107,7 @@ update msg model =
                     World.update
                         (\body ->
                             body
-                                |> Body.applyForce (Force.newtons 300)
+                                |> Body.applyForce (Force.newtons 100000)
                                     Direction3d.positiveZ
                                     (Body.originPoint body)
                         )
@@ -95,6 +115,15 @@ update msg model =
               }
             , Cmd.none
             )
+
+        KeyUp Jump ->
+            ( model, Cmd.none )
+
+        KeyDown Rocket ->
+            ( { model | rockets = True }, Cmd.none )
+
+        KeyUp Rocket ->
+            ( { model | rockets = False }, Cmd.none )
 
         Resize width height ->
             ( { model | screenWidth = width, screenHeight = height }
@@ -108,8 +137,7 @@ subscriptions _ =
         [ Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
         , Events.onAnimationFrameDelta Tick
         , Events.onKeyDown (keyDecoder KeyDown)
-
-        --, Events.onKeyUp (keyDecoder KeyUp)
+        , Events.onKeyUp (keyDecoder KeyUp)
         ]
 
 
@@ -121,6 +149,9 @@ keyDecoder toMsg =
                 case string of
                     " " ->
                         Json.Decode.succeed (toMsg Jump)
+
+                    "Shift" ->
+                        Json.Decode.succeed (toMsg Rocket)
 
                     _ ->
                         Json.Decode.fail ("Unrecognized key: " ++ string)
@@ -181,13 +212,13 @@ view { world, screenWidth, screenHeight } =
 initialWorld : World (Scene3d.Entity BodyCoordinates)
 initialWorld =
     let
-        moonGravity =
-            Acceleration.metersPerSecondSquared 1.62
+        earthGravity =
+            Acceleration.metersPerSecondSquared 9.807
     in
     World.empty
-        |> World.withGravity moonGravity Direction3d.negativeZ
+        |> World.withGravity earthGravity Direction3d.negativeZ
         |> World.add floor
-        |> addBoxes
+        --|> addBoxes
         |> addCar
 
 
@@ -245,7 +276,7 @@ addCar =
         body =
             Scene3d.block Scene3d.castsShadows Materials.gold shape
                 |> Body.block shape
-                |> Body.withBehavior (Body.dynamic (Mass.kilograms 5))
+                |> Body.withBehavior (Body.dynamic (Mass.kilograms 1190))
     in
     body
         |> Body.moveTo (Point3d.meters 0 0 3)
@@ -324,7 +355,7 @@ floor =
             Length.inMeters floorSize
     in
     Scene3d.quad Scene3d.doesNotCastShadows
-        (Material.uniform Materials.aluminum)
+        (Material.uniform Materials.blackPlastic)
         (point -size -size)
         (point -size size)
         (point size size)
