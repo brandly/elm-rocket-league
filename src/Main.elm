@@ -165,8 +165,15 @@ view { world, screenWidth, screenHeight } =
             Camera3d.perspective
                 { viewpoint =
                     Viewpoint3d.lookAt
-                        { eyePoint = Point3d.meters 0 20 20
-                        , focalPoint = Point3d.meters 0 0 0
+                        { eyePoint = Point3d.meters 0 100 100
+                        , focalPoint =
+                            world
+                                |> World.bodies
+                                -- TODO: identify these bodies, find the car
+                                |> List.drop 1
+                                |> List.head
+                                |> Maybe.map (Body.frame >> Frame3d.originPoint)
+                                |> Maybe.withDefault (Point3d.meters 0 0 0)
                         , upDirection = Direction3d.positiveZ
                         }
                 , verticalFieldOfView = Angle.degrees 24
