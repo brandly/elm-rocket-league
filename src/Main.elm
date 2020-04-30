@@ -98,7 +98,7 @@ update msg model =
                     model.world
                         |> World.update
                             (\body ->
-                                if model.rockets then
+                                if (Body.data body).id == Car && model.rockets then
                                     body
                                         |> Body.applyForce (Force.newtons 50000)
                                             Direction3d.negativeY
@@ -241,8 +241,8 @@ initialWorld =
     World.empty
         |> World.withGravity earthGravity Direction3d.negativeZ
         |> World.add floor
-        --|> addBoxes
         |> addCar
+        |> addBall
 
 
 addCar : World Data -> World Data
@@ -264,6 +264,22 @@ addCar =
     in
     body
         |> Body.moveTo (Point3d.meters 0 0 3)
+        |> World.add
+
+
+addBall : World Data -> World Data
+addBall =
+    let
+        shape =
+            Sphere3d.atOrigin (Length.meters 5)
+
+        entity =
+            Scene3d.sphere Scene3d.castsShadows (Material.uniform Materials.chromium) shape
+    in
+    { id = Ball, entity = entity }
+        |> Body.sphere shape
+        |> Body.withBehavior (Body.dynamic (Mass.kilograms 200))
+        |> Body.moveTo (Point3d.meters 0 -30 10)
         |> World.add
 
 
@@ -293,25 +309,6 @@ floor =
         |> Body.plane
         |> Body.moveTo
             (Point3d.meters 0 0 0)
-
-
-sphereRadius : Length
-sphereRadius =
-    Length.meters 0.45
-
-
-sphere : Material.Textured BodyCoordinates -> Body Data
-sphere material =
-    let
-        shape =
-            Sphere3d.atOrigin sphereRadius
-
-        entity =
-            Scene3d.sphere Scene3d.castsShadows material shape
-    in
-    { id = Ball, entity = entity }
-        |> Body.sphere shape
-        |> Body.withBehavior (Body.dynamic (Mass.kilograms 2.5))
 
 
 getTransformedDrawable : Body Data -> Scene3d.Entity WorldCoordinates
