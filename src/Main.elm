@@ -101,7 +101,7 @@ update msg model =
                                 if (Body.data body).id == Car && model.rockets then
                                     body
                                         |> Body.applyForce (Force.newtons 50000)
-                                            Direction3d.negativeY
+                                            (body |> Body.frame >> Frame3d.yDirection)
                                             (Body.originPoint body)
 
                                 else
