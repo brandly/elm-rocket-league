@@ -117,10 +117,15 @@ update msg model =
                 | world =
                     World.update
                         (\body ->
-                            body
-                                |> Body.applyForce (Force.newtons 100000)
-                                    Direction3d.positiveZ
-                                    (Body.originPoint body)
+                            if (Body.data body).id == Car then
+                                body
+                                    |> Body.applyForce (Force.newtons 400000)
+                                        -- TODO: add direction modifier keys
+                                        (body |> Body.frame >> Frame3d.zDirection)
+                                        (Body.originPoint body)
+
+                            else
+                                body
                         )
                         model.world
               }
