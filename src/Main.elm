@@ -26,9 +26,11 @@ import Physics.Coordinates exposing (BodyCoordinates, WorldCoordinates)
 import Physics.World as World exposing (World)
 import Pixels exposing (pixels)
 import Point3d
+import Quantity exposing (Quantity(..))
 import Random
 import Scene3d
 import Scene3d.Material as Material
+import SketchPlane3d
 import Sphere3d
 import Task
 import Viewpoint3d
@@ -164,17 +166,23 @@ view { world, screenWidth, screenHeight } =
         camera =
             Camera3d.perspective
                 { viewpoint =
-                    Viewpoint3d.lookAt
-                        { eyePoint = Point3d.meters 0 100 100
-                        , focalPoint =
-                            world
-                                |> World.bodies
-                                -- TODO: identify these bodies, find the car
-                                |> List.drop 1
-                                |> List.head
+                    Viewpoint3d.orbit
+                        { focalPoint =
+                            let
+                                car =
+                                    -- TODO: identify these bodies, find the car
+                                    world
+                                        |> World.bodies
+                                        |> List.drop 1
+                                        |> List.head
+                            in
+                            car
                                 |> Maybe.map (Body.frame >> Frame3d.originPoint)
                                 |> Maybe.withDefault (Point3d.meters 0 0 0)
-                        , upDirection = Direction3d.positiveZ
+                        , groundPlane = SketchPlane3d.xy
+                        , azimuth = Angle.degrees 90
+                        , elevation = Angle.degrees 12
+                        , distance = Quantity 60.0
                         }
                 , verticalFieldOfView = Angle.degrees 24
                 }
