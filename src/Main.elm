@@ -2,7 +2,6 @@ module Main exposing (main)
 
 import Acceleration
 import Angle
-import Array exposing (Array)
 import Block3d
 import Browser
 import Browser.Dom as Dom
@@ -20,14 +19,12 @@ import Length exposing (Length, inMeters, meters)
 import Luminance
 import Mass
 import Materials
-import Palette.Tango as Tango
 import Physics.Body as Body exposing (Body)
 import Physics.Coordinates exposing (BodyCoordinates, WorldCoordinates)
 import Physics.World as World exposing (World)
 import Pixels exposing (pixels)
 import Point3d
 import Quantity exposing (Quantity(..))
-import Random
 import Scene3d
 import Scene3d.Material as Material
 import SketchPlane3d
@@ -36,8 +33,20 @@ import Task
 import Viewpoint3d
 
 
+type alias Data =
+    { entity : Scene3d.Entity BodyCoordinates
+    , id : EntityId
+    }
+
+
+type EntityId
+    = Arena
+    | Car
+    | Ball
+
+
 type alias Model =
-    { world : World (Scene3d.Entity BodyCoordinates)
+    { world : World Data
     , rockets : Bool
     , screenWidth : Float
     , screenHeight : Float
@@ -170,10 +179,9 @@ view { world, screenWidth, screenHeight } =
                         { focalPoint =
                             let
                                 car =
-                                    -- TODO: identify these bodies, find the car
                                     world
                                         |> World.bodies
-                                        |> List.drop 1
+                                        |> List.filter (Body.data >> .id >> (==) Car)
                                         |> List.head
                             in
                             car
@@ -224,7 +232,7 @@ view { world, screenWidth, screenHeight } =
         ]
 
 
-initialWorld : World (Scene3d.Entity BodyCoordinates)
+initialWorld : World Data
 initialWorld =
     let
         earthGravity =
@@ -237,59 +245,20 @@ initialWorld =
         |> addCar
 
 
-materials : Array (Material.Uniform coordinates)
-materials =
-    Array.fromList
-        [ Materials.aluminum
-        , Materials.whitePlastic
-        , Materials.copper
-        , Material.nonmetal
-            { baseColor = Tango.skyBlue1
-            , roughness = 0.25
-            }
-        , Materials.gold
-        , Materials.whitePlastic
-        , Material.nonmetal
-            { baseColor = Tango.skyBlue2
-            , roughness = 0.25
-            }
-        ]
-
-
-type alias Offsets =
-    { x : Float
-    , y : Float
-    , z : Float
-    }
-
-
-offsetGenerator : Random.Generator Offsets
-offsetGenerator =
-    let
-        magnitude =
-            0.01
-    in
-    Random.map3 Offsets
-        (Random.float -magnitude magnitude)
-        (Random.float -magnitude magnitude)
-        (Random.float -magnitude magnitude)
-
-
-randomOffsets : Int -> Offsets
-randomOffsets index =
-    Random.step offsetGenerator (Random.initialSeed index)
-        |> Tuple.first
-
-
-addCar : World (Scene3d.Entity BodyCoordinates) -> World (Scene3d.Entity BodyCoordinates)
+addCar : World Data -> World Data
 addCar =
     let
         shape =
             Block3d.centeredOn Frame3d.atOrigin
                 ( Length.meters 3, Length.meters 5.26, Length.meters 2 )
 
-        body =
+        entity =
             Scene3d.block Scene3d.castsShadows Materials.gold shape
+
+        body =
+            { id = Car
+            , entity = entity
+            }
                 |> Body.block shape
                 |> Body.withBehavior (Body.dynamic (Mass.kilograms 1190))
     in
@@ -298,69 +267,12 @@ addCar =
         |> World.add
 
 
-addBoxes : World (Scene3d.Entity BodyCoordinates) -> World (Scene3d.Entity BodyCoordinates)
-addBoxes world =
-    let
-        xySize =
-            4
-
-        zSize =
-            5
-
-        xyDimensions =
-            List.map toFloat (List.range 0 (xySize - 1))
-
-        zDimensions =
-            List.map toFloat (List.range 0 (zSize - 1))
-
-        distance =
-            1
-
-        coords : List ( Float, Float, Float )
-        coords =
-            List.map (\x -> List.map (\y -> List.map (\z -> ( x, y, z )) zDimensions) xyDimensions) xyDimensions
-                |> List.concat
-                |> List.concat
-    in
-    List.foldl
-        (\( x, y, z ) ->
-            let
-                index =
-                    round (z * xySize * xySize + y * xySize + x)
-
-                material =
-                    Array.get (index |> modBy (Array.length materials)) materials
-                        |> Maybe.withDefault Materials.aluminum
-
-                body =
-                    if (index |> modBy 3) == 0 then
-                        box material
-
-                    else
-                        sphere (Material.uniform material)
-
-                offsets =
-                    randomOffsets index
-            in
-            body
-                |> Body.moveTo
-                    (Point3d.meters
-                        ((x - (xySize - 1) / 2) * distance + offsets.x)
-                        ((y - (xySize - 1) / 2) * distance + offsets.y)
-                        ((z + (2 * zSize + 1) / 2) * distance + offsets.z)
-                    )
-                |> World.add
-        )
-        world
-        coords
-
-
 floorSize : Length
 floorSize =
     Length.meters 150
 
 
-floor : Body (Scene3d.Entity BodyCoordinates)
+floor : Body Data
 floor =
     let
         point x y =
@@ -368,38 +280,19 @@ floor =
 
         size =
             Length.inMeters floorSize
+
+        entity =
+            Scene3d.quad Scene3d.doesNotCastShadows
+                (Material.uniform Materials.blackPlastic)
+                (point -size -size)
+                (point -size size)
+                (point size size)
+                (point size -size)
     in
-    Scene3d.quad Scene3d.doesNotCastShadows
-        (Material.uniform Materials.blackPlastic)
-        (point -size -size)
-        (point -size size)
-        (point size size)
-        (point size -size)
+    { id = Arena, entity = entity }
         |> Body.plane
         |> Body.moveTo
             (Point3d.meters 0 0 0)
-
-
-boxSize : Length
-boxSize =
-    Length.meters 0.9
-
-
-boxWithSize : Length -> Material.Uniform BodyCoordinates -> Body (Scene3d.Entity BodyCoordinates)
-boxWithSize size_ material =
-    let
-        shape =
-            Block3d.centeredOn Frame3d.atOrigin
-                ( size_, size_, size_ )
-    in
-    Scene3d.block Scene3d.castsShadows material shape
-        |> Body.block shape
-        |> Body.withBehavior (Body.dynamic (Mass.kilograms 5))
-
-
-box : Material.Uniform BodyCoordinates -> Body (Scene3d.Entity BodyCoordinates)
-box =
-    boxWithSize boxSize
 
 
 sphereRadius : Length
@@ -407,17 +300,20 @@ sphereRadius =
     Length.meters 0.45
 
 
-sphere : Material.Textured BodyCoordinates -> Body (Scene3d.Entity BodyCoordinates)
+sphere : Material.Textured BodyCoordinates -> Body Data
 sphere material =
     let
         shape =
             Sphere3d.atOrigin sphereRadius
+
+        entity =
+            Scene3d.sphere Scene3d.castsShadows material shape
     in
-    Scene3d.sphere Scene3d.castsShadows material shape
+    { id = Ball, entity = entity }
         |> Body.sphere shape
         |> Body.withBehavior (Body.dynamic (Mass.kilograms 2.5))
 
 
-getTransformedDrawable : Body (Scene3d.Entity BodyCoordinates) -> Scene3d.Entity WorldCoordinates
+getTransformedDrawable : Body Data -> Scene3d.Entity WorldCoordinates
 getTransformedDrawable body =
-    Scene3d.placeIn (Body.frame body) (Body.data body)
+    Scene3d.placeIn (Body.frame body) (Body.data body).entity
