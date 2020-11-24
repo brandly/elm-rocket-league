@@ -28,6 +28,7 @@ import Pixels exposing (pixels)
 import Point3d
 import Quantity exposing (Quantity(..))
 import Scene3d
+import Scene3d.Light as Light
 import Scene3d.Material as Material
 import SketchPlane3d
 import Sphere3d
@@ -285,16 +286,16 @@ view { world, screenWidth, screenHeight } =
             List.map getTransformedDrawable (World.bodies world)
 
         sunlight =
-            Scene3d.directionalLight Scene3d.castsShadows
-                { chromaticity = Scene3d.sunlight
+            Light.directional (Light.castsShadows True)
+                { chromaticity = Light.sunlight
                 , intensity = Illuminance.lux 10000
                 , direction = Direction3d.xyZ (Angle.degrees 45) (Angle.degrees -60)
                 }
 
         daylight =
-            Scene3d.overheadLighting
+            Light.overhead
                 { upDirection = Direction3d.z
-                , chromaticity = Scene3d.daylight
+                , chromaticity = Light.daylight
                 , intensity = Illuminance.lux 15000
                 }
     in
@@ -303,18 +304,18 @@ view { world, screenWidth, screenHeight } =
         , Html.Attributes.style "left" "0"
         , Html.Attributes.style "top" "0"
         ]
-        [ Scene3d.toHtml
-            { dimensions = ( pixels screenWidth, pixels screenHeight )
+        [ Scene3d.custom
+            { dimensions = ( pixels (Basics.floor screenWidth), pixels (Basics.floor screenHeight) )
             , antialiasing = Scene3d.multisampling
             , camera = camera
             , lights = Scene3d.twoLights sunlight daylight
             , exposure = Scene3d.maxLuminance (Luminance.nits 10000)
             , toneMapping = Scene3d.noToneMapping
-            , whiteBalance = Scene3d.daylight
+            , whiteBalance = Light.daylight
             , background = Scene3d.transparentBackground
             , clipDepth = meters 0.1
+            , entities = drawables
             }
-            drawables
         ]
 
 
@@ -342,7 +343,7 @@ addCar world =
                 ( Length.meters 3, Length.meters 5.26, Length.meters 2 )
 
         entity =
-            Scene3d.block Scene3d.castsShadows Materials.gold shape
+            Scene3d.block Materials.gold shape
 
         body =
             { id = Car
@@ -387,7 +388,7 @@ wheel id =
             Sphere3d.atOrigin wheelRadius
 
         entity =
-            Scene3d.sphere Scene3d.castsShadows (Material.uniform Materials.chromium) sphere
+            Scene3d.sphere (Material.uniform Materials.chromium) sphere
     in
     Body.sphere sphere
         { id = Wheel id
@@ -403,7 +404,7 @@ addBall =
             Sphere3d.atOrigin (Length.meters 5)
 
         entity =
-            Scene3d.sphere Scene3d.castsShadows (Material.uniform Materials.chromium) shape
+            Scene3d.sphere (Material.uniform Materials.chromium) shape
     in
     { id = Ball
     , entity = entity
@@ -429,7 +430,7 @@ floor =
             Length.inMeters floorSize
 
         entity =
-            Scene3d.quad Scene3d.doesNotCastShadows
+            Scene3d.quad
                 (Material.uniform Materials.blackPlastic)
                 (point -size -size)
                 (point -size size)
