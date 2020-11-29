@@ -1,16 +1,16 @@
 module Main exposing (main)
 
 import Acceleration
-import Angle
+import Angle exposing (Angle)
 import Axis3d
 import Block3d
 import Browser
 import Browser.Dom as Dom
 import Browser.Events as Events
 import Camera3d
-import Direction3d
+import Direction3d exposing (Direction3d)
 import Duration
-import Force
+import Force exposing (Force)
 import Frame3d exposing (Frame3d)
 import Html exposing (Html)
 import Html.Attributes
@@ -25,7 +25,7 @@ import Physics.Constraint as Constraint exposing (Constraint)
 import Physics.Coordinates exposing (BodyCoordinates, WorldCoordinates)
 import Physics.World as World exposing (World)
 import Pixels exposing (pixels)
-import Point3d
+import Point3d exposing (Point3d)
 import Quantity exposing (Quantity(..))
 import Scene3d
 import Scene3d.Light as Light
@@ -45,16 +45,41 @@ type alias Data =
 
 type EntityId
     = Arena
-    | Car
+    | Car (List Wheel)
     | Ball
-    | Wheel WheelId
 
 
-type WheelId
-    = FrontRight
-    | FrontLeft
-    | BackRight
-    | BackLeft
+type alias Wheel =
+    { chassisConnectionPoint : Point3d Meters BodyCoordinates
+    , steering : Angle
+    , rotation : Angle
+    , deltaRotation : Angle
+    , suspensionImpulse :
+        Quantity Float (Quantity.Product Force.Newtons Duration.Seconds)
+    , suspensionLength : Length
+    , engineForce : Force
+    , brake : Force
+    , contact :
+        Maybe
+            { point : Point3d Meters WorldCoordinates
+            , normal : Direction3d WorldCoordinates
+            , body : Body Data
+            }
+    }
+
+
+defaultWheel : Wheel
+defaultWheel =
+    { chassisConnectionPoint = Point3d.origin -- set for different wheels
+    , steering = Quantity.zero
+    , rotation = Quantity.zero
+    , deltaRotation = Quantity.zero
+    , suspensionImpulse = Quantity.zero
+    , suspensionLength = Quantity.zero
+    , engineForce = Quantity.zero
+    , brake = Quantity.zero
+    , contact = Nothing
+    }
 
 
 type alias Model =
@@ -79,6 +104,43 @@ type Command
     | Rocket
     | Steer Float
     | Speed Float
+
+
+type alias CarSettings =
+    { downDirection : Direction3d BodyCoordinates
+    , rightDirection : Direction3d BodyCoordinates
+    , forwardDirection : Direction3d BodyCoordinates
+    , suspensionRestLength : Length
+    , minSuspensionLength : Length
+    , maxSuspensionLength : Length
+    , radius : Length
+    , suspensionStiffness : Float
+    , dampingCompression : Float
+    , dampingRelaxation : Float
+    , frictionSlip : Float
+    , rollInfluence : Float
+    , maxSuspensionForce : Force
+    , customSlidingRotationalSpeed : Maybe Float
+    }
+
+
+carSettings : CarSettings
+carSettings =
+    { downDirection = Direction3d.negativeZ
+    , rightDirection = Direction3d.y
+    , forwardDirection = Direction3d.x
+    , suspensionRestLength = Length.meters 0.3
+    , minSuspensionLength = Length.meters 0
+    , maxSuspensionLength = Length.meters 0.6
+    , radius = Length.meters 0.5
+    , suspensionStiffness = 30
+    , dampingCompression = 4.4
+    , dampingRelaxation = 2.3
+    , frictionSlip = 5
+    , rollInfluence = 0.01
+    , maxSuspensionForce = Force.newtons 100000
+    , customSlidingRotationalSpeed = Just -30
+    }
 
 
 main : Program () Model Msg
@@ -117,17 +179,24 @@ update msg model =
                         baseFrame =
                             model.world
                                 |> World.bodies
-                                |> List.filter (\b -> (Body.data b).id == Car)
+                                |> List.filter
+                                    (\b ->
+                                        case (Body.data b).id of
+                                            Car _ ->
+                                                True
+
+                                            _ ->
+                                                False
+                                    )
                                 |> List.head
                                 |> Maybe.map Body.frame
                                 |> Maybe.withDefault Frame3d.atOrigin
                     in
                     model.world
-                        |> World.constrain (constrainCar model.steering)
                         |> World.update
                             (\body ->
                                 case (Body.data body).id of
-                                    Car ->
+                                    Car wheels ->
                                         if model.rockets then
                                             body
                                                 |> Body.applyForce (Force.newtons 50000)
@@ -137,12 +206,6 @@ update msg model =
 
                                         else
                                             body
-
-                                    Wheel FrontRight ->
-                                        applySpeed model.speeding baseFrame body
-
-                                    Wheel FrontLeft ->
-                                        applySpeed model.speeding baseFrame body
 
                                     _ ->
                                         body
@@ -157,15 +220,16 @@ update msg model =
                 | world =
                     World.update
                         (\body ->
-                            if (Body.data body).id == Car then
-                                body
-                                    |> Body.applyForce (Force.newtons 400000)
-                                        -- TODO: add direction modifier keys
-                                        (body |> Body.frame >> Frame3d.zDirection)
-                                        (Body.originPoint body)
+                            case (Body.data body).id of
+                                Car _ ->
+                                    body
+                                        |> Body.applyForce (Force.newtons 400000)
+                                            -- TODO: add direction modifier keys
+                                            (body |> Body.frame >> Frame3d.zDirection)
+                                            (Body.originPoint body)
 
-                            else
-                                body
+                                _ ->
+                                    body
                         )
                         model.world
               }
@@ -268,7 +332,18 @@ view { world, screenWidth, screenHeight } =
                                 car =
                                     world
                                         |> World.bodies
-                                        |> List.filter (Body.data >> .id >> (==) Car)
+                                        |> List.filter
+                                            (Body.data
+                                                >> .id
+                                                >> (\id ->
+                                                        case id of
+                                                            Car _ ->
+                                                                True
+
+                                                            _ ->
+                                                                False
+                                                   )
+                                            )
                                         |> List.head
                             in
                             car
@@ -345,8 +420,15 @@ addCar world =
         entity =
             Scene3d.block Materials.gold shape
 
+        wheels =
+            [ { defaultWheel | chassisConnectionPoint = Point3d.meters 1 1 0 }
+            , { defaultWheel | chassisConnectionPoint = Point3d.meters 1 -1 0 }
+            , { defaultWheel | chassisConnectionPoint = Point3d.meters -1 1 0 }
+            , { defaultWheel | chassisConnectionPoint = Point3d.meters -1 -1 0 }
+            ]
+
         body =
-            { id = Car
+            { id = Car wheels
             , entity = entity
             }
                 |> Body.block shape
@@ -355,46 +437,10 @@ addCar world =
     in
     world
         |> World.add body
-        |> World.add
-            (wheel BackLeft
-                |> Body.moveTo offset
-                |> Body.translateBy (Vector3d.meters 2.5 2.5 -1)
-            )
-        |> World.add
-            (wheel BackRight
-                |> Body.moveTo offset
-                |> Body.translateBy (Vector3d.meters -2.5 2.5 -1)
-            )
-        |> World.add
-            (wheel FrontRight
-                |> Body.moveTo offset
-                |> Body.translateBy (Vector3d.meters -2.5 -2.5 -1)
-            )
-        |> World.add
-            (wheel FrontLeft
-                |> Body.moveTo offset
-                |> Body.translateBy (Vector3d.meters 2.5 -2.5 -1)
-            )
 
 
 wheelRadius =
     Length.meters 0.8
-
-
-wheel : WheelId -> Body Data
-wheel id =
-    let
-        sphere =
-            Sphere3d.atOrigin wheelRadius
-
-        entity =
-            Scene3d.sphere (Material.uniform Materials.chromium) sphere
-    in
-    Body.sphere sphere
-        { id = Wheel id
-        , entity = entity
-        }
-        |> Body.withBehavior (Body.dynamic (Mass.kilograms 2))
 
 
 addBall : World Data -> World Data
@@ -446,79 +492,6 @@ floor =
 getTransformedDrawable : Body Data -> Scene3d.Entity WorldCoordinates
 getTransformedDrawable body =
     Scene3d.placeIn (Body.frame body) (Body.data body).entity
-
-
-constrainCar : Float -> Body Data -> Body Data -> List Constraint
-constrainCar steering b1 b2 =
-    let
-        steeringAngle =
-            steering * pi / 8
-
-        dx =
-            cos steeringAngle
-
-        dy =
-            sin steeringAngle
-
-        backLeftHinge =
-            Constraint.hinge
-                (Axis3d.through
-                    (Point3d.meters 2.5 2.5 -1)
-                    (Direction3d.unsafe { x = 1, y = 0, z = 0 })
-                )
-                (Axis3d.through
-                    Point3d.origin
-                    (Direction3d.unsafe { x = -1, y = 0, z = 0 })
-                )
-
-        backRightHinge =
-            Constraint.hinge
-                (Axis3d.through
-                    (Point3d.meters -2.5 2.5 -1)
-                    (Direction3d.unsafe { x = -1, y = 0, z = 0 })
-                )
-                (Axis3d.through
-                    Point3d.origin
-                    (Direction3d.unsafe { x = 1, y = 0, z = 0 })
-                )
-
-        frontRightHinge =
-            Constraint.hinge
-                (Axis3d.through
-                    (Point3d.meters -2.5 -2.5 -1)
-                    (Direction3d.unsafe { x = -dx, y = dy, z = 0 })
-                )
-                (Axis3d.through
-                    Point3d.origin
-                    (Direction3d.unsafe { x = 1, y = 0, z = 0 })
-                )
-
-        frontLeftHinge =
-            Constraint.hinge
-                (Axis3d.through
-                    (Point3d.meters 2.5 -2.5 -1)
-                    (Direction3d.unsafe { x = -dx, y = dy, z = 0 })
-                )
-                (Axis3d.through
-                    Point3d.origin
-                    (Direction3d.unsafe { x = -1, y = 0, z = 0 })
-                )
-    in
-    case ( (Body.data b1).id, (Body.data b2).id ) of
-        ( Car, Wheel BackLeft ) ->
-            [ backLeftHinge ]
-
-        ( Car, Wheel BackRight ) ->
-            [ backRightHinge ]
-
-        ( Car, Wheel FrontRight ) ->
-            [ frontRightHinge ]
-
-        ( Car, Wheel FrontLeft ) ->
-            [ frontLeftHinge ]
-
-        _ ->
-            []
 
 
 applySpeed : Float -> Frame3d Meters WorldCoordinates { defines : BodyCoordinates } -> Body Data -> Body Data
