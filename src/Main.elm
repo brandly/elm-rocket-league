@@ -200,8 +200,7 @@ update msg model =
                                         if model.rockets then
                                             body
                                                 |> Body.applyForce (Force.newtons 50000)
-                                                    -- TODO: sort out coords, remove need for this reverse
-                                                    (body |> Body.frame >> Frame3d.yDirection >> Direction3d.reverse)
+                                                    (Direction3d.placeIn baseFrame carSettings.forwardDirection)
                                                     (Body.originPoint body)
 
                                         else
@@ -350,7 +349,7 @@ view { world, screenWidth, screenHeight } =
                                 |> Maybe.map (Body.frame >> Frame3d.originPoint)
                                 |> Maybe.withDefault (Point3d.meters 0 0 0)
                         , groundPlane = SketchPlane3d.xy
-                        , azimuth = Angle.degrees 90
+                        , azimuth = Angle.degrees 180
                         , elevation = Angle.degrees 12
                         , distance = Quantity 60.0
                         }
@@ -457,7 +456,7 @@ addBall =
     }
         |> Body.sphere shape
         |> Body.withBehavior (Body.dynamic (Mass.kilograms 200))
-        |> Body.moveTo (Point3d.meters 0 -30 10)
+        |> Body.moveTo (Point3d.meters 30 0 5)
         |> World.add
 
 
