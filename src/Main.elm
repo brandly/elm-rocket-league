@@ -402,19 +402,19 @@ initialWorld =
     World.empty
         |> World.withGravity earthGravity Direction3d.negativeZ
         |> World.add floor
-        |> addCar
+        |> World.add base
         |> addBall
 
 
-addCar : World Data -> World Data
-addCar world =
+base : Body Data
+base =
     let
         offset =
             Point3d.meters 0 0 3
 
         shape =
             Block3d.centeredOn Frame3d.atOrigin
-                ( Length.meters 3, Length.meters 5.26, Length.meters 2 )
+                ( Length.meters 5.26, Length.meters 3, Length.meters 2 )
 
         entity =
             Scene3d.block Materials.gold shape
@@ -425,17 +425,13 @@ addCar world =
             , { defaultWheel | chassisConnectionPoint = Point3d.meters -1 1 0 }
             , { defaultWheel | chassisConnectionPoint = Point3d.meters -1 -1 0 }
             ]
-
-        body =
-            { id = Car wheels
-            , entity = entity
-            }
-                |> Body.block shape
-                |> Body.withBehavior (Body.dynamic (Mass.kilograms 1190))
-                |> Body.moveTo offset
     in
-    world
-        |> World.add body
+    { id = Car wheels
+    , entity = entity
+    }
+        |> Body.block shape
+        |> Body.withBehavior (Body.dynamic (Mass.kilograms 1190))
+        |> Body.moveTo offset
 
 
 wheelRadius =
