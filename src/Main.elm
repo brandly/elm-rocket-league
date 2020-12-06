@@ -175,23 +175,6 @@ update msg model =
             -- TODO: measure tick time instead of 1/60?
             ( { model
                 | world =
-                    let
-                        baseFrame =
-                            model.world
-                                |> World.bodies
-                                |> List.filter
-                                    (\b ->
-                                        case (Body.data b).id of
-                                            Car _ ->
-                                                True
-
-                                            _ ->
-                                                False
-                                    )
-                                |> List.head
-                                |> Maybe.map Body.frame
-                                |> Maybe.withDefault Frame3d.atOrigin
-                    in
                     model.world
                         |> World.update
                             (\body ->
@@ -200,7 +183,7 @@ update msg model =
                                         if model.rockets then
                                             body
                                                 |> Body.applyForce (Force.newtons 50000)
-                                                    (Direction3d.placeIn baseFrame carSettings.forwardDirection)
+                                                    (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
                                                     (Body.originPoint body)
 
                                         else
