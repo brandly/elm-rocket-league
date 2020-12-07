@@ -459,6 +459,12 @@ initialWorld =
         |> World.withGravity earthGravity Direction3d.negativeZ
         |> World.add floor
         |> World.add base
+        |> World.add (box (Point3d.meters 15 -15 1))
+        |> World.add (box (Point3d.meters 15 -16.5 1))
+        |> World.add (box (Point3d.meters 15 -18 1))
+        |> World.add (box (Point3d.meters 15 -16 2))
+        |> World.add (box (Point3d.meters 15 -17.5 2))
+        |> World.add (box (Point3d.meters 15 -16.5 3))
         |> addBall
 
 
@@ -1053,3 +1059,34 @@ applySpeed speed baseFrame body =
         |> Body.applyForce (Force.newtons (-speed * 10000))
             (Direction3d.reverse forward)
             pointUnderTheWheel
+
+
+box : Point3d Meters WorldCoordinates -> Body Data
+box position =
+    let
+        block3d =
+            Block3d.centeredOn
+                Frame3d.atOrigin
+                ( Length.meters 1
+                , Length.meters 1
+                , Length.meters 1
+                )
+
+        shape =
+            Block3d.centeredOn Frame3d.atOrigin ( Length.meters 1, Length.meters 1, Length.meters 1 )
+
+        --( Length.meters 4, Length.meters 2, Length.meters 1 )
+    in
+    Body.block block3d
+        { id = Obstacle
+        , entity =
+            Scene3d.block
+                (Material.nonmetal
+                    { baseColor = Color.rgb255 0 0 0
+                    , roughness = 0.5
+                    }
+                )
+                shape
+        }
+        |> Body.withBehavior (Body.dynamic (Mass.kilograms 10))
+        |> Body.moveTo position
