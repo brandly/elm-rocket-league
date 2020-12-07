@@ -180,25 +180,22 @@ update msg model =
             ( { model
                 | world =
                     model.world
-                        --|> World.update
-                        --    (\body ->
-                        --        case (Body.data body).id of
-                        --            Car wheels ->
-                        --                if model.rockets then
-                        --                    body
-                        --                        |> Body.applyForce (Force.newtons 50000)
-                        --                            (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
-                        --                            (Body.originPoint body)
-                        --                else
-                        --                    body
-                        --            _ ->
-                        --                body
-                        --    )
                         |> World.update
                             (\body ->
                                 case (Body.data body).id of
                                     Car wheels ->
+                                        let
+                                            boost =
+                                                if model.rockets then
+                                                    Body.applyForce (Force.newtons 30000)
+                                                        (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
+                                                        (Body.originPoint body)
+
+                                                else
+                                                    identity
+                                        in
                                         simulateCar (Duration.seconds (1 / 60)) model wheels body
+                                            |> boost
 
                                     _ ->
                                         body
@@ -980,7 +977,7 @@ addBall : World Data -> World Data
 addBall =
     let
         shape =
-            Sphere3d.atOrigin (Length.meters 3)
+            Sphere3d.atOrigin (Length.meters 2)
 
         entity =
             Scene3d.sphere (Material.uniform Materials.chromium) shape
@@ -989,8 +986,8 @@ addBall =
     , entity = entity
     }
         |> Body.sphere shape
-        |> Body.withBehavior (Body.dynamic (Mass.kilograms 200))
-        |> Body.moveTo (Point3d.meters 30 0 5)
+        |> Body.withBehavior (Body.dynamic (Mass.kilograms 50))
+        |> Body.moveTo (Point3d.meters 10 0 5)
         |> World.add
 
 
