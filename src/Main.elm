@@ -180,7 +180,7 @@ init _ =
     , Cmd.batch
         [ Task.attempt TextureResponse <|
             Material.loadWith Material.trilinearFiltering
-                "http://localhost:8000/static/floor-tile.jpg"
+                "/static/floor-tile.jpg"
         , Task.perform (\{ viewport } -> Resize viewport.width viewport.height)
             Dom.getViewport
         ]
