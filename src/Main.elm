@@ -1087,7 +1087,7 @@ ball =
 
 floorSize : Length
 floorSize =
-    Length.meters 100
+    Length.meters 200
 
 
 floor : Material.Texture Color -> Body Data
@@ -1096,25 +1096,50 @@ floor texture =
         point x y =
             Point3d.meters x y 0
 
-        size =
+        fullSize =
             Length.inMeters floorSize
 
-        entity =
-            Scene3d.quad
-                (Material.texturedNonmetal
-                    { baseColor = texture
-                    , roughness = Material.constant 0.25
-                    }
-                )
-                (point -size -size)
-                (point -size size)
-                (point size size)
-                (point size -size)
+        texturedMaterial =
+            Material.texturedNonmetal
+                { baseColor = texture
+                , roughness = Material.constant 0.25
+                }
+
+        tileCount =
+            10
+
+        tileSize =
+            fullSize / tileCount
+
+        coords : List ( Int, Int )
+        coords =
+            List.range 0 tileCount
+                |> List.concatMap
+                    (\x ->
+                        List.range 0 tileCount
+                            |> List.map (\y -> ( x, y ))
+                    )
+
+        entities =
+            -- TODO: is there an easier way to say "repeat texture every x pixels"?
+            coords
+                |> List.map
+                    (\( first, second ) ->
+                        let
+                            ( x, y ) =
+                                ( toFloat first * tileSize, toFloat second * tileSize )
+                        in
+                        Scene3d.quad texturedMaterial
+                            (point x y)
+                            (point x (y + tileSize))
+                            (point (x + tileSize) (y + tileSize))
+                            (point (x + tileSize) y)
+                    )
     in
-    { id = Obstacle, entity = entity }
+    { id = Obstacle, entity = Scene3d.group entities }
         |> Body.plane
         |> Body.moveTo
-            (Point3d.meters 0 0 0)
+            (Point3d.meters (-fullSize / 2) (-fullSize / 2) 0)
 
 
 getTransformedDrawable : Body Data -> Scene3d.Entity WorldCoordinates
