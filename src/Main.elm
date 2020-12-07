@@ -195,7 +195,7 @@ update msg model =
     in
     case ( model.status, msg ) of
         ( _, Resize w h ) ->
-            ( Debug.log "resize" { model | screenSize = { width = w, height = h } }
+            ( { model | screenSize = { width = w, height = h } }
             , Cmd.none
             )
 
@@ -573,10 +573,10 @@ simulateCar dt { world, steering, braking, speeding } wheels car =
                         Quantity.zero
 
                 wheel1 =
-                    { w1 | steering = Angle.degrees (30 * steering), engineForce = engineForce, brake = brake }
+                    { w1 | steering = Angle.degrees (20 * steering), engineForce = engineForce, brake = brake }
 
                 wheel2 =
-                    { w2 | steering = Angle.degrees (30 * steering), engineForce = engineForce, brake = brake }
+                    { w2 | steering = Angle.degrees (20 * steering), engineForce = engineForce, brake = brake }
 
                 wheel3 =
                     { w3 | engineForce = engineForce, brake = brake }
@@ -1034,7 +1034,7 @@ base : Body Data
 base =
     let
         offset =
-            Point3d.meters 0 0 3
+            Point3d.meters -80 0 3
 
         shape =
             Block3d.centeredOn Frame3d.atOrigin
@@ -1082,7 +1082,7 @@ ball =
     }
         |> Body.sphere shape
         |> Body.withBehavior (Body.dynamic (Mass.kilograms 50))
-        |> Body.moveTo (Point3d.meters 10 0 5)
+        |> Body.moveTo (Point3d.meters 0 0 5)
 
 
 floorSize : Length
