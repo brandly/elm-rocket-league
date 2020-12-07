@@ -314,35 +314,44 @@ view : Model -> Html Msg
 view { world, screenWidth, screenHeight } =
     let
         camera =
+            let
+                car =
+                    world
+                        |> World.bodies
+                        |> List.filter
+                            (Body.data
+                                >> .id
+                                >> (\id ->
+                                        case id of
+                                            Car _ ->
+                                                True
+
+                                            _ ->
+                                                False
+                                   )
+                            )
+                        |> List.head
+            in
             Camera3d.perspective
                 { viewpoint =
                     Viewpoint3d.orbit
                         { focalPoint =
-                            let
-                                car =
-                                    world
-                                        |> World.bodies
-                                        |> List.filter
-                                            (Body.data
-                                                >> .id
-                                                >> (\id ->
-                                                        case id of
-                                                            Car _ ->
-                                                                True
-
-                                                            _ ->
-                                                                False
-                                                   )
-                                            )
-                                        |> List.head
-                            in
                             car
                                 |> Maybe.map (Body.frame >> Frame3d.originPoint)
                                 |> Maybe.withDefault (Point3d.meters 0 0 0)
                         , groundPlane = SketchPlane3d.xy
-                        , azimuth = Angle.degrees 180
+                        , azimuth =
+                            car
+                                |> Maybe.map
+                                    (\body ->
+                                        Direction3d.placeIn (Body.frame body) carSettings.forwardDirection
+                                            |> Direction3d.reverse
+                                            |> Direction3d.azimuthIn
+                                                SketchPlane3d.xy
+                                    )
+                                |> Maybe.withDefault (Angle.degrees 180)
                         , elevation = Angle.degrees 12
-                        , distance = Quantity 60.0
+                        , distance = Quantity 30.0
                         }
                 , verticalFieldOfView = Angle.degrees 24
                 }
