@@ -335,11 +335,14 @@ view { world, screenWidth, screenHeight } =
             Camera3d.perspective
                 { viewpoint =
                     Viewpoint3d.orbit
-                        { focalPoint =
+                        { -- Focus on a point meters above the car
+                          focalPoint =
                             car
                                 |> Maybe.map (Body.frame >> Frame3d.originPoint)
+                                |> Maybe.map (Point3d.translateBy (Vector3d.meters 0 0 4))
                                 |> Maybe.withDefault (Point3d.meters 0 0 0)
-                        , groundPlane = SketchPlane3d.xy
+
+                        -- Look the direction the car is pointing
                         , azimuth =
                             car
                                 |> Maybe.map
@@ -350,8 +353,11 @@ view { world, screenWidth, screenHeight } =
                                                 SketchPlane3d.xy
                                     )
                                 |> Maybe.withDefault (Angle.degrees 180)
-                        , elevation = Angle.degrees 12
+
+                        -- With a low angle of view
+                        , elevation = Angle.degrees 3
                         , distance = Quantity 30.0
+                        , groundPlane = SketchPlane3d.xy
                         }
                 , verticalFieldOfView = Angle.degrees 24
                 }
