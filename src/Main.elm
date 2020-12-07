@@ -8,7 +8,7 @@ import Browser
 import Browser.Dom as Dom
 import Browser.Events as Events
 import Camera3d
-import Color
+import Color exposing (Color)
 import Direction3d exposing (Direction3d)
 import Duration exposing (Duration)
 import Force exposing (Force)
@@ -36,6 +36,7 @@ import Sphere3d exposing (Sphere3d)
 import Task
 import Vector3d
 import Viewpoint3d
+import WebGL.Texture
 
 
 type alias Data =
@@ -84,15 +85,13 @@ defaultWheel =
     }
 
 
-type alias Model =
+type alias Game =
     { world : World Data
     , rockets : Bool
     , steering : Float -- -1, 0, 1
     , speeding : Float -- -1, 0, 1
     , braking : Bool
     , boostTank : Float
-    , screenWidth : Float
-    , screenHeight : Float
     }
 
 
@@ -101,6 +100,7 @@ type Msg
     | Resize Float Float
     | KeyDown Command
     | KeyUp Command
+    | TextureResponse (Result WebGL.Texture.Error (Material.Texture Color))
 
 
 type Command
@@ -157,126 +157,175 @@ main =
         }
 
 
+type alias ScreenSize =
+    { width : Float
+    , height : Float
+    }
+
+
+type alias Model =
+    { status : Status
+    , screenSize : ScreenSize
+    }
+
+
+type Status
+    = Loading
+    | Playing Game
+
+
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { world = initialWorld
-      , rockets = False
-      , steering = 0
-      , speeding = 0
-      , braking = False
-      , boostTank = 100
-      , screenWidth = 0
-      , screenHeight = 0
-      }
-    , Task.perform
-        (\{ viewport } -> Resize viewport.width viewport.height)
-        Dom.getViewport
+    ( { screenSize = { width = 0, height = 0 }, status = Loading }
+    , Cmd.batch
+        [ Task.attempt TextureResponse <|
+            Material.loadWith Material.trilinearFiltering
+                "http://localhost:8000/static/floor-tile.jpg"
+        , Task.perform (\{ viewport } -> Resize viewport.width viewport.height)
+            Dom.getViewport
+        ]
     )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
-        Tick _ ->
+    let
+        keepPlaying g =
+            { model | status = Playing g }
+    in
+    case ( model.status, msg ) of
+        ( _, Resize w h ) ->
+            ( Debug.log "resize" { model | screenSize = { width = w, height = h } }
+            , Cmd.none
+            )
+
+        ( Playing game, Tick _ ) ->
             -- TODO: measure tick time instead of 1/60?
-            ( { model
-                | world =
-                    model.world
-                        |> World.update
+            ( keepPlaying
+                { game
+                    | world =
+                        game.world
+                            |> World.update
+                                (\body ->
+                                    case (Body.data body).id of
+                                        Car wheels ->
+                                            let
+                                                boost =
+                                                    if game.rockets then
+                                                        Body.applyForce (Force.newtons 30000)
+                                                            (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
+                                                            (Body.originPoint body)
+
+                                                    else
+                                                        identity
+                                            in
+                                            simulateCar (Duration.seconds (1 / 60)) game wheels body
+                                                |> boost
+
+                                        _ ->
+                                            body
+                                )
+                            |> World.simulate (Duration.seconds (1 / 60))
+                    , boostTank =
+                        if game.rockets then
+                            game.boostTank - 0.5
+
+                        else
+                            game.boostTank
+                }
+            , Cmd.none
+            )
+
+        ( Playing game, KeyDown Jump ) ->
+            ( keepPlaying
+                { game
+                    | world =
+                        World.update
                             (\body ->
                                 case (Body.data body).id of
-                                    Car wheels ->
-                                        let
-                                            boost =
-                                                if model.rockets then
-                                                    Body.applyForce (Force.newtons 30000)
-                                                        (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
-                                                        (Body.originPoint body)
-
-                                                else
-                                                    identity
-                                        in
-                                        simulateCar (Duration.seconds (1 / 60)) model wheels body
-                                            |> boost
+                                    Car _ ->
+                                        body
+                                            |> Body.applyForce (Force.newtons 400000)
+                                                -- TODO: add direction modifier keys
+                                                (body |> Body.frame >> Frame3d.zDirection)
+                                                (Body.originPoint body)
 
                                     _ ->
                                         body
                             )
-                        |> World.simulate (Duration.seconds (1 / 60))
-                , boostTank =
-                    if model.rockets then
-                        model.boostTank - 0.5
-
-                    else
-                        model.boostTank
-              }
+                            game.world
+                }
             , Cmd.none
             )
 
-        KeyDown Jump ->
-            ( { model
-                | world =
-                    World.update
-                        (\body ->
-                            case (Body.data body).id of
-                                Car _ ->
-                                    body
-                                        |> Body.applyForce (Force.newtons 400000)
-                                            -- TODO: add direction modifier keys
-                                            (body |> Body.frame >> Frame3d.zDirection)
-                                            (Body.originPoint body)
+        ( Playing game, KeyUp Jump ) ->
+            ( keepPlaying game, Cmd.none )
 
-                                _ ->
-                                    body
-                        )
-                        model.world
-              }
+        ( Playing game, KeyDown Rocket ) ->
+            ( keepPlaying { game | rockets = True }, Cmd.none )
+
+        ( Playing game, KeyUp Rocket ) ->
+            ( keepPlaying { game | rockets = False }, Cmd.none )
+
+        ( Playing game, KeyDown (Steer k) ) ->
+            ( keepPlaying { game | steering = k }, Cmd.none )
+
+        ( Playing game, KeyUp (Steer k) ) ->
+            ( keepPlaying
+                { game
+                    | steering =
+                        if k == game.steering then
+                            0
+
+                        else
+                            game.steering
+                }
             , Cmd.none
             )
 
-        KeyUp Jump ->
+        ( Playing game, KeyDown (Speed k) ) ->
+            ( keepPlaying { game | speeding = k }, Cmd.none )
+
+        ( Playing game, KeyUp (Speed k) ) ->
+            ( keepPlaying
+                { game
+                    | speeding =
+                        if k == game.speeding then
+                            0
+
+                        else
+                            game.speeding
+                }
+            , Cmd.none
+            )
+
+        ( Playing _, TextureResponse _ ) ->
             ( model, Cmd.none )
 
-        KeyDown Rocket ->
-            ( { model | rockets = True }, Cmd.none )
-
-        KeyUp Rocket ->
-            ( { model | rockets = False }, Cmd.none )
-
-        KeyDown (Steer k) ->
-            ( { model | steering = k }, Cmd.none )
-
-        KeyUp (Steer k) ->
+        ( Loading, TextureResponse (Ok texture) ) ->
             ( { model
-                | steering =
-                    if k == model.steering then
-                        0
-
-                    else
-                        model.steering
+                | status =
+                    Playing
+                        { world =
+                            initialWorld
+                                |> World.add (floor texture)
+                        , rockets = False
+                        , steering = 0
+                        , speeding = 0
+                        , braking = False
+                        , boostTank = 100
+                        }
               }
             , Cmd.none
             )
 
-        KeyDown (Speed k) ->
-            ( { model | speeding = k }, Cmd.none )
-
-        KeyUp (Speed k) ->
-            ( { model
-                | speeding =
-                    if k == model.speeding then
-                        0
-
-                    else
-                        model.speeding
-              }
+        ( Loading, TextureResponse (Err err) ) ->
+            ( Debug.log (Debug.toString err) <| model
             , Cmd.none
             )
 
-        Resize width height ->
-            ( { model | screenWidth = width, screenHeight = height }
-            , Cmd.none
-            )
+        ( Loading, _ ) ->
+            ( model, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg
@@ -319,7 +368,23 @@ keyDecoder toMsg =
 
 
 view : Model -> Html Msg
-view { world, boostTank, screenWidth, screenHeight } =
+view model =
+    Html.div
+        [ Html.Attributes.style "position" "absolute"
+        , Html.Attributes.style "left" "0"
+        , Html.Attributes.style "top" "0"
+        ]
+        (case model.status of
+            Loading ->
+                [ Html.p [] [ Html.text "Loading........" ] ]
+
+            Playing game ->
+                viewGame model.screenSize game
+        )
+
+
+viewGame : ScreenSize -> Game -> List (Html Msg)
+viewGame { width, height } { world, boostTank } =
     let
         camera =
             let
@@ -387,31 +452,26 @@ view { world, boostTank, screenWidth, screenHeight } =
                 , intensity = Illuminance.lux 15000
                 }
     in
-    Html.div
-        [ Html.Attributes.style "position" "absolute"
-        , Html.Attributes.style "left" "0"
-        , Html.Attributes.style "top" "0"
+    [ Scene3d.custom
+        { dimensions = ( pixels (Basics.floor width), pixels (Basics.floor height) )
+        , antialiasing = Scene3d.multisampling
+        , camera = camera
+        , lights = Scene3d.twoLights sunlight daylight
+        , exposure = Scene3d.maxLuminance (Luminance.nits 10000)
+        , toneMapping = Scene3d.noToneMapping
+        , whiteBalance = Light.daylight
+        , background = Scene3d.transparentBackground
+        , clipDepth = meters 0.1
+        , entities = drawables
+        }
+    , Html.p
+        [ Html.Attributes.style "position" "fixed"
+        , Html.Attributes.style "bottom" "12px"
+        , Html.Attributes.style "right" "24px"
+        , Html.Attributes.style "font-size" "48px"
         ]
-        [ Scene3d.custom
-            { dimensions = ( pixels (Basics.floor screenWidth), pixels (Basics.floor screenHeight) )
-            , antialiasing = Scene3d.multisampling
-            , camera = camera
-            , lights = Scene3d.twoLights sunlight daylight
-            , exposure = Scene3d.maxLuminance (Luminance.nits 10000)
-            , toneMapping = Scene3d.noToneMapping
-            , whiteBalance = Light.daylight
-            , background = Scene3d.transparentBackground
-            , clipDepth = meters 0.1
-            , entities = drawables
-            }
-        , Html.p
-            [ Html.Attributes.style "position" "fixed"
-            , Html.Attributes.style "bottom" "12px"
-            , Html.Attributes.style "right" "24px"
-            , Html.Attributes.style "font-size" "48px"
-            ]
-            [ Html.text (String.fromInt (round boostTank)) ]
-        ]
+        [ Html.text (String.fromInt (round boostTank)) ]
+    ]
 
 
 addWheelsToWorld : World Data -> World Data
@@ -487,7 +547,6 @@ initialWorld =
     in
     World.empty
         |> World.withGravity earthGravity Direction3d.negativeZ
-        |> World.add floor
         |> World.add base
         |> World.add (box (Point3d.meters 15 -15 1))
         |> World.add (box (Point3d.meters 15 -16.5 1))
@@ -498,7 +557,7 @@ initialWorld =
         |> addBall
 
 
-simulateCar : Duration -> Model -> List Wheel -> Body Data -> Body Data
+simulateCar : Duration -> Game -> List Wheel -> Body Data -> Body Data
 simulateCar dt { world, steering, braking, speeding } wheels car =
     case wheels of
         [ w1, w2, w3, w4 ] ->
@@ -1029,11 +1088,10 @@ addBall =
 
 floorSize : Length
 floorSize =
-    Length.meters 500
+    Length.meters 100
 
 
-floor : Body Data
-floor =
+floor texture =
     let
         point x y =
             Point3d.meters x y 0
@@ -1043,7 +1101,11 @@ floor =
 
         entity =
             Scene3d.quad
-                (Material.uniform Materials.blackPlastic)
+                (Material.texturedNonmetal
+                    { baseColor = texture
+                    , roughness = Material.constant 0.25
+                    }
+                )
                 (point -size -size)
                 (point -size size)
                 (point size size)
