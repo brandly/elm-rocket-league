@@ -211,7 +211,7 @@ update msg model =
                                         Car wheels ->
                                             let
                                                 boost =
-                                                    if game.rockets then
+                                                    if game.rockets && game.boostTank > 0 then
                                                         Body.applyForce (Force.newtons 30000)
                                                             (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
                                                             (Body.originPoint body)
@@ -228,7 +228,7 @@ update msg model =
                             |> World.simulate (Duration.seconds (1 / 60))
                     , boostTank =
                         if game.rockets then
-                            game.boostTank - 0.5
+                            max 0 (game.boostTank - 0.5)
 
                         else
                             game.boostTank
