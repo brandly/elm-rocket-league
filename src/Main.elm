@@ -554,7 +554,7 @@ initialWorld =
         |> World.add (box (Point3d.meters 15 -16 2))
         |> World.add (box (Point3d.meters 15 -17.5 2))
         |> World.add (box (Point3d.meters 15 -16.5 3))
-        |> addBall
+        |> World.add ball
 
 
 simulateCar : Duration -> Game -> List Wheel -> Body Data -> Body Data
@@ -1068,8 +1068,8 @@ wheelRadius =
     Length.meters 0.8
 
 
-addBall : World Data -> World Data
-addBall =
+ball : Body Data
+ball =
     let
         shape =
             Sphere3d.atOrigin (Length.meters 2)
@@ -1083,7 +1083,6 @@ addBall =
         |> Body.sphere shape
         |> Body.withBehavior (Body.dynamic (Mass.kilograms 50))
         |> Body.moveTo (Point3d.meters 10 0 5)
-        |> World.add
 
 
 floorSize : Length
@@ -1091,6 +1090,7 @@ floorSize =
     Length.meters 100
 
 
+floor : Material.Texture Color -> Body Data
 floor texture =
     let
         point x y =
