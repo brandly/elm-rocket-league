@@ -90,6 +90,7 @@ type alias Model =
     , steering : Float -- -1, 0, 1
     , speeding : Float -- -1, 0, 1
     , braking : Bool
+    , boostTank : Float
     , screenWidth : Float
     , screenHeight : Float
     }
@@ -163,6 +164,7 @@ init _ =
       , steering = 0
       , speeding = 0
       , braking = False
+      , boostTank = 100
       , screenWidth = 0
       , screenHeight = 0
       }
@@ -201,6 +203,12 @@ update msg model =
                                         body
                             )
                         |> World.simulate (Duration.seconds (1 / 60))
+                , boostTank =
+                    if model.rockets then
+                        model.boostTank - 0.5
+
+                    else
+                        model.boostTank
               }
             , Cmd.none
             )
@@ -311,7 +319,7 @@ keyDecoder toMsg =
 
 
 view : Model -> Html Msg
-view { world, screenWidth, screenHeight } =
+view { world, boostTank, screenWidth, screenHeight } =
     let
         camera =
             let
@@ -396,6 +404,13 @@ view { world, screenWidth, screenHeight } =
             , clipDepth = meters 0.1
             , entities = drawables
             }
+        , Html.p
+            [ Html.Attributes.style "position" "fixed"
+            , Html.Attributes.style "bottom" "12px"
+            , Html.Attributes.style "right" "24px"
+            , Html.Attributes.style "font-size" "48px"
+            ]
+            [ Html.text (String.fromInt (round boostTank)) ]
         ]
 
 
