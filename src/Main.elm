@@ -563,11 +563,11 @@ simulateCar dt { world, steering, braking, speeding } wheels car =
         [ w1, w2, w3, w4 ] ->
             let
                 engineForce =
-                    Force.newtons (1000 * speeding)
+                    Force.newtons (4000 * speeding)
 
                 brake =
                     if braking then
-                        Force.newtons 1000
+                        Force.newtons 4000
 
                     else
                         Quantity.zero
