@@ -1,7 +1,8 @@
 {
     "type": "application",
     "source-directories": [
-        "src"
+        "src",
+        "../elm-physics/src"
     ],
     "elm-version": "0.19.1",
     "dependencies": {
@@ -20,8 +21,7 @@
             "ianmackenzie/elm-geometry": "3.9.0",
             "ianmackenzie/elm-geometry-linear-algebra-interop": "2.0.2",
             "ianmackenzie/elm-triangular-mesh": "1.1.0",
-            "ianmackenzie/elm-units": "2.7.0",
-            "w0rm/elm-physics": "5.1.1"
+            "ianmackenzie/elm-units": "2.7.0"
         },
         "indirect": {
             "elm/random": "1.0.0",

@@ -8,8 +8,9 @@ import Browser
 import Browser.Dom as Dom
 import Browser.Events as Events
 import Camera3d
+import Color
 import Direction3d exposing (Direction3d)
-import Duration
+import Duration exposing (Duration)
 import Force exposing (Force)
 import Frame3d exposing (Frame3d)
 import Html exposing (Html)
@@ -31,7 +32,7 @@ import Scene3d
 import Scene3d.Light as Light
 import Scene3d.Material as Material
 import SketchPlane3d
-import Sphere3d
+import Sphere3d exposing (Sphere3d)
 import Task
 import Vector3d
 import Viewpoint3d
@@ -47,6 +48,7 @@ type EntityId
     = Arena
     | Car (List Wheel)
     | Ball
+    | Obstacle
 
 
 type alias Wheel =
@@ -87,6 +89,7 @@ type alias Model =
     , rockets : Bool
     , steering : Float -- -1, 0, 1
     , speeding : Float -- -1, 0, 1
+    , braking : Bool
     , screenWidth : Float
     , screenHeight : Float
     }
@@ -159,6 +162,7 @@ init _ =
       , rockets = False
       , steering = 0
       , speeding = 0
+      , braking = False
       , screenWidth = 0
       , screenHeight = 0
       }
@@ -176,18 +180,25 @@ update msg model =
             ( { model
                 | world =
                     model.world
+                        --|> World.update
+                        --    (\body ->
+                        --        case (Body.data body).id of
+                        --            Car wheels ->
+                        --                if model.rockets then
+                        --                    body
+                        --                        |> Body.applyForce (Force.newtons 50000)
+                        --                            (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
+                        --                            (Body.originPoint body)
+                        --                else
+                        --                    body
+                        --            _ ->
+                        --                body
+                        --    )
                         |> World.update
                             (\body ->
                                 case (Body.data body).id of
                                     Car wheels ->
-                                        if model.rockets then
-                                            body
-                                                |> Body.applyForce (Force.newtons 50000)
-                                                    (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
-                                                    (Body.originPoint body)
-
-                                        else
-                                            body
+                                        simulateCar (Duration.seconds (1 / 60)) model wheels body
 
                                     _ ->
                                         body
@@ -340,7 +351,7 @@ view { world, screenWidth, screenHeight } =
                 }
 
         drawables =
-            List.map getTransformedDrawable (World.bodies world)
+            List.map getTransformedDrawable (World.bodies (addWheelsToWorld world))
 
         sunlight =
             Light.directional (Light.castsShadows True)
@@ -376,6 +387,71 @@ view { world, screenWidth, screenHeight } =
         ]
 
 
+addWheelsToWorld : World Data -> World Data
+addWheelsToWorld world =
+    let
+        maybeCar =
+            world
+                |> World.bodies
+                |> List.filterMap
+                    (\b ->
+                        case (Body.data b).id of
+                            Car wheels ->
+                                Just ( wheels, b )
+
+                            _ ->
+                                Nothing
+                    )
+                |> List.head
+    in
+    case maybeCar of
+        Just ( wheels, car ) ->
+            List.foldl
+                (\wheel ->
+                    let
+                        frame =
+                            Body.frame car
+
+                        position =
+                            wheel.chassisConnectionPoint
+                                |> Point3d.placeIn (Body.frame car)
+
+                        downDirection =
+                            carSettings.downDirection
+                                |> Direction3d.placeIn (Body.frame car)
+
+                        rightDirection =
+                            carSettings.rightDirection
+                                |> Direction3d.placeIn (Body.frame car)
+
+                        newPosition =
+                            position |> Point3d.translateBy (Vector3d.withLength wheel.suspensionLength downDirection)
+
+                        newFrame =
+                            frame
+                                |> Frame3d.moveTo newPosition
+                                |> Frame3d.rotateAround (Axis3d.through newPosition downDirection) wheel.steering
+                                |> Frame3d.rotateAround (Axis3d.through newPosition rightDirection) wheel.rotation
+                    in
+                    World.add
+                        (Body.sphere wheelShape
+                            { id = Obstacle
+                            , entity = wheelBody
+                            }
+                            |> Body.placeIn newFrame
+                        )
+                )
+                world
+                wheels
+
+        Nothing ->
+            world
+
+
+wheelBody =
+    Scene3d.sphere (Material.uniform Materials.chromium) (Sphere3d.atOrigin carSettings.radius)
+
+
 initialWorld : World Data
 initialWorld =
     let
@@ -389,6 +465,479 @@ initialWorld =
         |> addBall
 
 
+simulateCar : Duration -> Model -> List Wheel -> Body Data -> Body Data
+simulateCar dt { world, steering, braking, speeding } wheels car =
+    case wheels of
+        [ w1, w2, w3, w4 ] ->
+            let
+                engineForce =
+                    Force.newtons (1000 * speeding)
+
+                brake =
+                    if braking then
+                        Force.newtons 1000
+
+                    else
+                        Quantity.zero
+
+                wheel1 =
+                    { w1 | steering = Angle.degrees (30 * steering), engineForce = engineForce, brake = brake }
+
+                wheel2 =
+                    { w2 | steering = Angle.degrees (30 * steering), engineForce = engineForce, brake = brake }
+
+                wheel3 =
+                    { w3 | engineForce = engineForce, brake = brake }
+
+                wheel4 =
+                    { w4 | engineForce = engineForce, brake = brake }
+            in
+            updateSuspension dt world (Body.frame car) car [ wheel1, wheel2, wheel3, wheel4 ] car [] 0
+
+        _ ->
+            car
+
+
+updateSuspension : Duration -> World Data -> Frame3d Meters WorldCoordinates { defines : BodyCoordinates } -> Body Data -> List Wheel -> Body Data -> List Wheel -> Int -> Body Data
+updateSuspension dt world frame originalCar currentWheels updatedCar updatedWheels numWheelsOnGround =
+    case currentWheels of
+        [] ->
+            updateFriction dt world frame updatedCar numWheelsOnGround updatedWheels [] [] False
+
+        wheel :: remainingWheels ->
+            let
+                ray =
+                    Axis3d.through wheel.chassisConnectionPoint carSettings.downDirection
+                        |> Axis3d.placeIn frame
+            in
+            case World.raycast ray (World.keepIf (\b -> (Body.data b).id == Obstacle) world) of
+                Just { body, normal, point } ->
+                    let
+                        bodyFrame =
+                            Body.frame body
+
+                        contactPoint =
+                            Point3d.placeIn bodyFrame point
+
+                        contactNormal =
+                            Direction3d.placeIn bodyFrame normal
+
+                        distance =
+                            Point3d.distanceFrom contactPoint (Axis3d.originPoint ray)
+
+                        maxDistance =
+                            Quantity.plus carSettings.suspensionRestLength carSettings.radius
+                    in
+                    if Quantity.lessThan maxDistance distance then
+                        let
+                            suspensionLength =
+                                distance
+                                    |> Quantity.minus carSettings.radius
+                                    |> Quantity.clamp
+                                        carSettings.minSuspensionLength
+                                        carSettings.maxSuspensionLength
+
+                            difference =
+                                carSettings.suspensionRestLength
+                                    |> Quantity.minus suspensionLength
+                                    |> Length.inMeters
+
+                            (Quantity projectedVelocity) =
+                                Vector3d.dot
+                                    (Direction3d.toVector contactNormal)
+                                    (Body.velocityAt contactPoint originalCar)
+
+                            (Quantity denominator) =
+                                Vector3d.dot
+                                    (Direction3d.toVector contactNormal)
+                                    (Direction3d.toVector (Axis3d.direction ray))
+
+                            ( suspensionRelativeVelocity, clippedInvContactDotSuspension ) =
+                                if denominator >= -0.1 then
+                                    ( 0, 1 / 0.1 )
+
+                                else
+                                    ( -projectedVelocity / denominator, -1 / denominator )
+
+                            damping =
+                                if suspensionRelativeVelocity < 0 then
+                                    carSettings.dampingCompression
+
+                                else
+                                    carSettings.dampingRelaxation
+
+                            suspensionImpulse =
+                                ((carSettings.suspensionStiffness * difference * clippedInvContactDotSuspension)
+                                    - (damping * suspensionRelativeVelocity)
+                                )
+                                    |> (*) (Body.mass originalCar |> Maybe.map Mass.inKilograms |> Maybe.withDefault 0)
+                                    |> Force.newtons
+                                    |> Quantity.clamp Quantity.zero carSettings.maxSuspensionForce
+                                    |> Quantity.times dt
+                        in
+                        updateSuspension dt
+                            world
+                            frame
+                            originalCar
+                            remainingWheels
+                            (Body.applyImpulse
+                                suspensionImpulse
+                                contactNormal
+                                contactPoint
+                                updatedCar
+                            )
+                            ({ wheel
+                                | contact =
+                                    Just
+                                        { point = contactPoint
+                                        , normal = contactNormal
+                                        , body = body
+                                        }
+                                , suspensionLength = suspensionLength
+                                , suspensionImpulse = suspensionImpulse
+                             }
+                                :: updatedWheels
+                            )
+                            (numWheelsOnGround + 1)
+
+                    else
+                        updateSuspension dt
+                            world
+                            frame
+                            originalCar
+                            remainingWheels
+                            updatedCar
+                            ({ wheel
+                                | contact = Nothing
+                                , suspensionLength = carSettings.suspensionRestLength
+                             }
+                                :: updatedWheels
+                            )
+                            numWheelsOnGround
+
+                Nothing ->
+                    updateSuspension dt
+                        world
+                        frame
+                        originalCar
+                        remainingWheels
+                        updatedCar
+                        ({ wheel
+                            | contact = Nothing
+                            , suspensionLength = carSettings.suspensionRestLength
+                         }
+                            :: updatedWheels
+                        )
+                        numWheelsOnGround
+
+
+type alias WheelFriction =
+    { forward : Direction3d WorldCoordinates
+    , axle : Direction3d WorldCoordinates
+    , sideImpulse : Quantity Float (Quantity.Product Force.Newtons Duration.Seconds)
+    , forwardImpulse : Quantity Float (Quantity.Product Force.Newtons Duration.Seconds)
+    , skidInfo : Float
+    , contactPoint : Point3d Meters WorldCoordinates
+    , contactBody : Body Data
+    }
+
+
+updateFriction : Duration -> World Data -> Frame3d Meters WorldCoordinates { defines : BodyCoordinates } -> Body Data -> Int -> List Wheel -> List WheelFriction -> List Wheel -> Bool -> Body Data
+updateFriction dt world frame updatedCar numWheelsOnGround currentWheels wheelFrictions updatedWheels sliding =
+    case currentWheels of
+        [] ->
+            applyImpulses dt world frame updatedCar updatedWheels sliding wheelFrictions
+
+        wheel :: remainingWheels ->
+            case wheel.contact of
+                Just { point, normal, body } ->
+                    let
+                        worldAxle =
+                            carSettings.rightDirection
+                                |> Direction3d.rotateAround (Axis3d.through wheel.chassisConnectionPoint carSettings.downDirection) wheel.steering
+                                |> Direction3d.placeIn frame
+
+                        (Quantity proj) =
+                            Vector3d.dot (Direction3d.toVector normal) (Direction3d.toVector worldAxle)
+
+                        axle =
+                            Direction3d.toVector worldAxle
+                                |> Vector3d.minus (Vector3d.scaleBy proj (Direction3d.toVector normal))
+                                |> Vector3d.direction
+                                |> Maybe.withDefault normal
+
+                        forward =
+                            Vector3d.cross (Direction3d.toVector normal) (Direction3d.toVector axle)
+                                |> Vector3d.direction
+                                |> Maybe.withDefault normal
+
+                        sideImpulse =
+                            resolveSingleBilateral updatedCar body point axle
+
+                        maxImpulse =
+                            if wheel.brake == Quantity.zero then
+                                -- TODO: think about default rolling friction impulse
+                                Quantity.zero
+
+                            else
+                                Quantity.times dt wheel.brake
+
+                        forwardImpulse =
+                            Quantity.times dt wheel.engineForce
+                                |> Quantity.plus (calcRollingFriction updatedCar body point forward maxImpulse numWheelsOnGround)
+
+                        -- Switch between active rolling (throttle), braking and non-active rolling friction (nthrottle/break)
+                        maximpSide =
+                            Quantity.multiplyBy carSettings.frictionSlip wheel.suspensionImpulse
+
+                        impulseSquared =
+                            Quantity.times forwardImpulse forwardImpulse
+                                |> Quantity.multiplyBy 0.25
+                                |> Quantity.plus (Quantity.times sideImpulse sideImpulse)
+
+                        isSliding =
+                            Quantity.lessThan (Quantity.times maximpSide maximpSide) impulseSquared
+
+                        skidInfo =
+                            if isSliding then
+                                1
+
+                            else
+                                Quantity.ratio maximpSide (Quantity.sqrt impulseSquared)
+                    in
+                    updateFriction
+                        dt
+                        world
+                        frame
+                        updatedCar
+                        numWheelsOnGround
+                        remainingWheels
+                        ({ forward = forward
+                         , axle = axle
+                         , sideImpulse = sideImpulse
+                         , forwardImpulse = forwardImpulse
+                         , skidInfo = skidInfo
+                         , contactPoint = point
+                         , contactBody = body
+                         }
+                            :: wheelFrictions
+                        )
+                        (wheel :: updatedWheels)
+                        (sliding || isSliding)
+
+                Nothing ->
+                    updateFriction
+                        dt
+                        world
+                        frame
+                        updatedCar
+                        numWheelsOnGround
+                        remainingWheels
+                        wheelFrictions
+                        (wheel :: updatedWheels)
+                        sliding
+
+
+applyImpulses : Duration -> World Data -> Frame3d Meters WorldCoordinates { defines : BodyCoordinates } -> Body Data -> List Wheel -> Bool -> List WheelFriction -> Body Data
+applyImpulses dt world frame car wheels sliding wheelFrictions =
+    case wheelFrictions of
+        [] ->
+            rotateWheels dt frame car wheels []
+
+        friction :: remainingFrictions ->
+            let
+                centerOfMass =
+                    Body.centerOfMass car
+                        |> Point3d.placeIn frame
+
+                up =
+                    Direction3d.reverse carSettings.downDirection
+                        |> Direction3d.placeIn frame
+
+                verticalDistance =
+                    Vector3d.from friction.contactPoint centerOfMass
+                        |> Vector3d.componentIn up
+                        |> Quantity.multiplyBy (1 - carSettings.rollInfluence)
+
+                closerToCenterOfMass =
+                    Point3d.translateIn up verticalDistance friction.contactPoint
+
+                forwardImpulse =
+                    if sliding then
+                        Quantity.multiplyBy friction.skidInfo friction.forwardImpulse
+
+                    else
+                        friction.forwardImpulse
+
+                sideImpulse =
+                    if sliding then
+                        Quantity.multiplyBy friction.skidInfo friction.sideImpulse
+
+                    else
+                        friction.sideImpulse
+
+                newCar =
+                    car
+                        |> Body.applyImpulse forwardImpulse friction.forward friction.contactPoint
+                        |> Body.applyImpulse sideImpulse friction.axle closerToCenterOfMass
+
+                -- TODO: apply the reverse of the sideImpulse on the ground object too, for now assume it is static
+            in
+            applyImpulses
+                dt
+                world
+                frame
+                newCar
+                wheels
+                sliding
+                remainingFrictions
+
+
+rotateWheels : Duration -> Frame3d Meters WorldCoordinates { defines : BodyCoordinates } -> Body Data -> List Wheel -> List Wheel -> Body Data
+rotateWheels dt frame car wheels updatedWheels =
+    case wheels of
+        [] ->
+            Body.withData
+                { id = Car (List.reverse updatedWheels)
+                , entity = (Body.data car).entity
+                }
+                car
+
+        wheel :: remainingWheels ->
+            case wheel.contact of
+                Just { point, normal } ->
+                    let
+                        velocity =
+                            Body.velocityAt point car
+
+                        forward =
+                            Direction3d.placeIn frame carSettings.forwardDirection
+
+                        proj =
+                            Direction3d.componentIn normal forward
+
+                        (Quantity proj2) =
+                            forward
+                                |> Direction3d.toVector
+                                |> Vector3d.minus (Vector3d.withLength (Quantity proj) normal)
+                                |> Vector3d.dot velocity
+
+                        deltaRotation =
+                            Quantity (proj2 * Duration.inSeconds dt / Length.inMeters carSettings.radius)
+
+                        newWheel =
+                            { wheel
+                                | deltaRotation = deltaRotation
+                                , rotation = Quantity.plus wheel.rotation wheel.deltaRotation
+                            }
+                    in
+                    rotateWheels dt frame car remainingWheels (newWheel :: updatedWheels)
+
+                Nothing ->
+                    let
+                        deltaRotation =
+                            Quantity.multiplyBy 0.99 wheel.deltaRotation
+
+                        newWheel =
+                            { wheel
+                              -- damping when not in contact
+                                | deltaRotation = Quantity.multiplyBy 0.99 wheel.deltaRotation
+                                , rotation = Quantity.plus wheel.rotation deltaRotation
+                            }
+                    in
+                    rotateWheels dt frame car remainingWheels (newWheel :: updatedWheels)
+
+
+resolveSingleBilateral : Body Data -> Body Data -> Point3d Meters WorldCoordinates -> Direction3d WorldCoordinates -> Quantity Float (Quantity.Product Force.Newtons Duration.Seconds)
+resolveSingleBilateral body1 body2 point direction =
+    let
+        velocity1 =
+            Body.velocityAt point body1
+
+        velocity2 =
+            Body.velocityAt point body2
+
+        (Quantity relativeVelocity) =
+            Vector3d.dot (Vector3d.minus velocity2 velocity1) (Direction3d.toVector direction)
+
+        contactDamping =
+            0.2
+
+        invMass1 =
+            case Body.mass body1 of
+                Just mass ->
+                    1 / Mass.inKilograms mass
+
+                Nothing ->
+                    0
+
+        invMass2 =
+            case Body.mass body2 of
+                Just mass ->
+                    1 / Mass.inKilograms mass
+
+                Nothing ->
+                    0
+
+        massTerm =
+            1 / (invMass1 + invMass2)
+    in
+    Quantity (-contactDamping * relativeVelocity * massTerm)
+
+
+calcRollingFriction : Body Data -> Body Data -> Point3d Meters WorldCoordinates -> Direction3d WorldCoordinates -> Quantity Float (Quantity.Product Force.Newtons Duration.Seconds) -> Int -> Quantity Float (Quantity.Product Force.Newtons Duration.Seconds)
+calcRollingFriction body1 body2 point forward maxImpulse numWheelsOnGround =
+    let
+        velocity1 =
+            Body.velocityAt point body1
+
+        velocity2 =
+            Body.velocityAt point body2
+
+        (Quantity relativeVelocity) =
+            Vector3d.dot (Vector3d.minus velocity2 velocity1) (Direction3d.toVector forward)
+
+        denom1 =
+            computeImpulseDenominator body1 point forward
+
+        denom2 =
+            computeImpulseDenominator body2 point forward
+    in
+    Quantity (-relativeVelocity / (denom1 + denom2) / toFloat numWheelsOnGround)
+        |> Quantity.clamp (Quantity.negate maxImpulse) maxImpulse
+
+
+computeImpulseDenominator : Body Data -> Point3d Meters WorldCoordinates -> Direction3d WorldCoordinates -> Float
+computeImpulseDenominator body point normal =
+    let
+        position =
+            Point3d.placeIn (Body.frame body) (Body.centerOfMass body)
+
+        r0 =
+            Vector3d.from position point
+
+        c0 =
+            Vector3d.cross r0 (Direction3d.toVector normal)
+
+        vec =
+            Vector3d.cross (Body.transformWithInverseInertia body c0) r0
+
+        (Quantity dot) =
+            Vector3d.dot (Direction3d.toVector normal) vec
+    in
+    case Body.mass body of
+        Just mass ->
+            1 / Mass.inKilograms mass + dot
+
+        Nothing ->
+            dot
+
+
+wheelShape : Sphere3d Meters BodyCoordinates
+wheelShape =
+    Sphere3d.atOrigin carSettings.radius
+
+
 base : Body Data
 base =
     let
@@ -397,10 +946,16 @@ base =
 
         shape =
             Block3d.centeredOn Frame3d.atOrigin
-                ( Length.meters 5.26, Length.meters 3, Length.meters 2 )
+                ( Length.meters 4, Length.meters 2, Length.meters 1 )
 
         entity =
-            Scene3d.block Materials.gold shape
+            Scene3d.block
+                (Material.nonmetal
+                    { baseColor = Color.rgb255 0 0 0
+                    , roughness = 0.5
+                    }
+                )
+                shape
 
         wheels =
             [ { defaultWheel | chassisConnectionPoint = Point3d.meters 1 1 0 }
@@ -425,7 +980,7 @@ addBall : World Data -> World Data
 addBall =
     let
         shape =
-            Sphere3d.atOrigin (Length.meters 5)
+            Sphere3d.atOrigin (Length.meters 3)
 
         entity =
             Scene3d.sphere (Material.uniform Materials.chromium) shape
@@ -461,7 +1016,7 @@ floor =
                 (point size size)
                 (point size -size)
     in
-    { id = Arena, entity = entity }
+    { id = Obstacle, entity = entity }
         |> Body.plane
         |> Body.moveTo
             (Point3d.meters 0 0 0)
