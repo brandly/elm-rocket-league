@@ -9,6 +9,7 @@ import Browser.Dom as Dom
 import Browser.Events as Events
 import Camera3d
 import Color exposing (Color)
+import Cylinder3d exposing (Cylinder3d)
 import Direction3d exposing (Direction3d)
 import Duration exposing (Duration)
 import Force exposing (Force)
@@ -580,11 +581,11 @@ addWheelsToWorld world =
                         newFrame =
                             frame
                                 |> Frame3d.moveTo newPosition
+                                --|> Frame3d.rotateAround (Axis3d.through newPosition rightDirection) wheel.rotation
                                 |> Frame3d.rotateAround (Axis3d.through newPosition downDirection) wheel.steering
-                                |> Frame3d.rotateAround (Axis3d.through newPosition rightDirection) wheel.rotation
                     in
                     World.add
-                        (Body.sphere wheelShape
+                        (Body.cylinder wheelShape
                             { id = Obstacle
                             , entity = wheelBody
                             }
@@ -599,7 +600,7 @@ addWheelsToWorld world =
 
 
 wheelBody =
-    Scene3d.sphere (Material.uniform Materials.chromium) (Sphere3d.atOrigin carSettings.radius)
+    Scene3d.cylinder (Material.uniform Materials.chromium) wheelShape
 
 
 initialWorld : World Data
@@ -1088,29 +1089,53 @@ computeImpulseDenominator body point normal =
             dot
 
 
-wheelShape : Sphere3d Meters BodyCoordinates
+wheelShape : Cylinder3d Meters BodyCoordinates
 wheelShape =
-    Sphere3d.atOrigin carSettings.radius
+    Cylinder3d.centeredOn
+        Point3d.origin
+        Direction3d.y
+        { radius = carSettings.radius, length = Length.meters 0.3 }
 
 
 base : Body Data
 base =
+    -- TODO: better car shape
     let
         offset =
             Point3d.meters -80 0 3
 
         shape =
             Block3d.centeredOn Frame3d.atOrigin
-                ( Length.meters 4, Length.meters 2, Length.meters 1 )
+                ( Length.meters 3.2, Length.meters 2, Length.meters 0.5 )
+
+        material =
+            Material.nonmetal
+                { baseColor = Color.rgb255 0 0 0
+                , roughness = 0.5
+                }
 
         entity =
-            Scene3d.block
-                (Material.nonmetal
-                    { baseColor = Color.rgb255 0 0 0
-                    , roughness = 0.5
-                    }
-                )
-                shape
+            Scene3d.group
+                [ Scene3d.block material
+                    (Block3d.centeredOn Frame3d.atOrigin
+                        ( Length.meters 3.2, Length.meters 2, Length.meters 0.5 )
+                    )
+
+                --, Scene3d.block material
+                --    (Block3d.centeredOn
+                --        (Frame3d.atOrigin
+                --            |> Frame3d.translateBy
+                --                (Vector3d.withLength (Length.meters 0.5)
+                --                    (Frame3d.zDirection Frame3d.atOrigin)
+                --                )
+                --            |> Frame3d.translateBy
+                --                (Vector3d.withLength (Length.meters -0.3)
+                --                    (Frame3d.xDirection Frame3d.atOrigin)
+                --                )
+                --        )
+                --        ( Length.meters 2.5, Length.meters 1.8, Length.meters 0.5 )
+                --    )
+                ]
 
         wheels =
             [ { defaultWheel | chassisConnectionPoint = Point3d.meters 1 1 0 }
