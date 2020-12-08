@@ -52,6 +52,11 @@ type EntityId
     | Obstacle
 
 
+type CameraFocus
+    = BallCam
+    | ForwardCam
+
+
 type alias Wheel =
     { chassisConnectionPoint : Point3d Meters BodyCoordinates
     , steering : Angle
@@ -92,6 +97,7 @@ type alias Game =
     , speeding : Float -- -1, 0, 1
     , braking : Bool
     , boostTank : Float
+    , focus : CameraFocus
     }
 
 
@@ -108,6 +114,7 @@ type Command
     | Rocket
     | Steer Float
     | Speed Float
+    | ToggleCam
 
 
 type alias CarSettings =
@@ -299,6 +306,22 @@ update msg model =
             , Cmd.none
             )
 
+        ( Playing game, KeyDown ToggleCam ) ->
+            ( keepPlaying
+                { game
+                    | focus =
+                        if game.focus == BallCam then
+                            ForwardCam
+
+                        else
+                            BallCam
+                }
+            , Cmd.none
+            )
+
+        ( Playing game, KeyUp ToggleCam ) ->
+            ( model, Cmd.none )
+
         ( Playing _, TextureResponse _ ) ->
             ( model, Cmd.none )
 
@@ -308,12 +331,14 @@ update msg model =
                     Playing
                         { world =
                             initialWorld
+                                -- TODO: walls too
                                 |> World.add (floor texture)
                         , rockets = False
                         , steering = 0
                         , speeding = 0
                         , braking = False
                         , boostTank = 100
+                        , focus = BallCam
                         }
               }
             , Cmd.none
@@ -362,6 +387,9 @@ keyDecoder toMsg =
                     "Shift" ->
                         Json.Decode.succeed (toMsg Rocket)
 
+                    "c" ->
+                        Json.Decode.succeed (toMsg ToggleCam)
+
                     _ ->
                         Json.Decode.fail ("Unrecognized key: " ++ string)
             )
@@ -384,7 +412,7 @@ view model =
 
 
 viewGame : ScreenSize -> Game -> List (Html Msg)
-viewGame { width, height } { world, boostTank } =
+viewGame { width, height } { world, boostTank, focus } =
     let
         camera =
             let
@@ -404,32 +432,67 @@ viewGame { width, height } { world, boostTank } =
                                    )
                             )
                         |> List.head
+
+                ballBody =
+                    world
+                        |> World.bodies
+                        |> List.filter
+                            (Body.data
+                                >> .id
+                                >> (\id ->
+                                        case id of
+                                            Ball ->
+                                                True
+
+                                            _ ->
+                                                False
+                                   )
+                            )
+                        |> List.head
+
+                frameOrigin =
+                    Body.frame >> Frame3d.originPoint
+
+                defaultAngle =
+                    Angle.degrees 180
+
+                defaultPoint =
+                    Point3d.meters 0 0 0
+
+                ( focalPoint, azimuth, distance ) =
+                    case ( focus, ballBody, car ) of
+                        ( BallCam, Just ball_, Just car_ ) ->
+                            ( -- Focus on the ball
+                              frameOrigin ball_
+                            , Direction3d.from (frameOrigin ball_) (frameOrigin car_)
+                                |> Maybe.map (Direction3d.azimuthIn SketchPlane3d.xy)
+                                |> Maybe.withDefault defaultAngle
+                            , Point3d.distanceFrom (frameOrigin ball_) (frameOrigin car_)
+                                |> Quantity.plus (Length.meters 30)
+                            )
+
+                        ( ForwardCam, Just ball_, Just car_ ) ->
+                            ( -- Focus on a point meters above the car
+                              frameOrigin car_
+                                |> Point3d.translateBy (Vector3d.meters 0 0 4)
+                            , -- Look the direction the car is pointing
+                              Direction3d.placeIn (Body.frame car_) carSettings.forwardDirection
+                                |> Direction3d.reverse
+                                |> Direction3d.azimuthIn
+                                    SketchPlane3d.xy
+                            , Quantity 30
+                            )
+
+                        _ ->
+                            ( defaultPoint, defaultAngle, Quantity 30 )
             in
             Camera3d.perspective
                 { viewpoint =
                     Viewpoint3d.orbit
-                        { -- Focus on a point meters above the car
-                          focalPoint =
-                            car
-                                |> Maybe.map (Body.frame >> Frame3d.originPoint)
-                                |> Maybe.map (Point3d.translateBy (Vector3d.meters 0 0 4))
-                                |> Maybe.withDefault (Point3d.meters 0 0 0)
-
-                        -- Look the direction the car is pointing
-                        , azimuth =
-                            car
-                                |> Maybe.map
-                                    (\body ->
-                                        Direction3d.placeIn (Body.frame body) carSettings.forwardDirection
-                                            |> Direction3d.reverse
-                                            |> Direction3d.azimuthIn
-                                                SketchPlane3d.xy
-                                    )
-                                |> Maybe.withDefault (Angle.degrees 180)
-
-                        -- With a low angle of view
+                        { focalPoint = focalPoint
+                        , azimuth = azimuth
                         , elevation = Angle.degrees 3
-                        , distance = Quantity 30.0
+                        , distance = distance
                         , groundPlane = SketchPlane3d.xy
                         }
                 , verticalFieldOfView = Angle.degrees 24
