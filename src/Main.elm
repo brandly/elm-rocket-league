@@ -1383,7 +1383,7 @@ floor texture =
                 |> List.map (\x -> x * 10 - 75)
                 |> List.concatMap
                     (\x ->
-                        List.range 0 13
+                        List.range 0 12
                             |> List.map (\y -> y * 10 - 65)
                             |> List.map (\y -> ( toFloat x, toFloat y ))
                     )
@@ -1405,27 +1405,22 @@ floor texture =
 
 walls : List (Body Data)
 walls =
+    let
+        sideWall =
+            Body.plane
+                { id = Obstacle
+                , entity =
+                    Scene3d.quad
+                        (Material.uniform Materials.chromium)
+                        (Point3d.meters 0 0 0)
+                        (Point3d.meters 0 0 60)
+                        (Point3d.meters 150 0 0)
+                        (Point3d.meters 150 0 60)
+                }
+    in
     List.map (Body.withBehavior Body.static)
-        [ Body.plane
-            { id = Obstacle
-            , entity =
-                Scene3d.quad
-                    (Material.uniform Materials.chromium)
-                    (Point3d.meters -75 -65 0)
-                    (Point3d.meters -75 -65 60)
-                    (Point3d.meters 75 -65 0)
-                    (Point3d.meters 75 -65 60)
-            }
-        , Body.plane
-            { id = Obstacle
-            , entity =
-                Scene3d.quad
-                    (Material.uniform Materials.chromium)
-                    (Point3d.meters 75 65 0)
-                    (Point3d.meters 75 65 60)
-                    (Point3d.meters -75 65 0)
-                    (Point3d.meters -75 65 60)
-            }
+        [ sideWall |> Body.moveTo (Point3d.meters -75 65 0)
+        , sideWall |> Body.moveTo (Point3d.meters -75 -65 0)
         ]
 
 
