@@ -99,6 +99,20 @@ type alias Game =
     , braking : Bool
     , boostTank : Float
     , focus : CameraFocus
+    , lastTick : Float
+    , boosts : List ( Point3d Meters WorldCoordinates, Float )
+    }
+
+
+boostIsActive : Float -> ( Point3d Meters WorldCoordinates, Float ) -> Bool
+boostIsActive lastTick ( _, time ) =
+    (lastTick - time) > boostSettings.reloadTime
+
+
+boostSettings =
+    { reloadTime = 10000
+    , max = 100
+    , refill = 12
     }
 
 
@@ -207,7 +221,54 @@ update msg model =
             , Cmd.none
             )
 
-        ( Playing game, Tick _ ) ->
+        ( Playing game, Tick tick ) ->
+            let
+                carPoint =
+                    game.world
+                        |> World.bodies
+                        |> List.filter
+                            (Body.data
+                                >> .id
+                                >> (\id ->
+                                        case id of
+                                            Car _ ->
+                                                True
+
+                                            _ ->
+                                                False
+                                   )
+                            )
+                        |> List.head
+                        |> Maybe.map Body.originPoint
+                        |> Maybe.withDefault (Point3d.meters 0 0 0)
+
+                fullTank =
+                    game.boostTank >= boostSettings.max
+
+                carHits : ( Point3d Meters WorldCoordinates, Float ) -> Bool
+                carHits ( boostPoint, boostTime ) =
+                    not fullTank
+                        && ((game.lastTick - boostTime) > boostSettings.reloadTime)
+                        && (Point3d.distanceFrom carPoint boostPoint |> Length.inMeters)
+                        < 2.5
+
+                currentTick =
+                    game.lastTick + tick
+
+                applyRockets boostTank =
+                    if game.rockets then
+                        max 0 (boostTank - 0.5)
+
+                    else
+                        boostTank
+
+                applyConsumedBoosts boostTank =
+                    let
+                        consumingBoosts =
+                            List.filter carHits game.boosts
+                    in
+                    min boostSettings.max (toFloat (List.length consumingBoosts) * boostSettings.refill + boostTank)
+            in
             -- TODO: measure tick time instead of 1/60?
             ( keepPlaying
                 { game
@@ -235,11 +296,20 @@ update msg model =
                                 )
                             |> World.simulate (Duration.seconds (1 / 60))
                     , boostTank =
-                        if game.rockets then
-                            max 0 (game.boostTank - 0.5)
+                        game.boostTank
+                            |> applyConsumedBoosts
+                            |> applyRockets
+                    , lastTick = currentTick
+                    , boosts =
+                        game.boosts
+                            |> List.map
+                                (\( boostPoint, t ) ->
+                                    if carHits ( boostPoint, t ) then
+                                        ( boostPoint, currentTick )
 
-                        else
-                            game.boostTank
+                                    else
+                                        ( boostPoint, t )
+                                )
                 }
             , Cmd.none
             )
@@ -338,8 +408,15 @@ update msg model =
                         , steering = 0
                         , speeding = 0
                         , braking = False
-                        , boostTank = 100
+                        , boostTank = boostSettings.max
                         , focus = BallCam
+                        , lastTick = 0
+                        , boosts =
+                            List.range -10 10
+                                |> List.map
+                                    (\n ->
+                                        ( Point3d.meters 0 (toFloat n * 10) 0, -boostSettings.reloadTime )
+                                    )
                         }
               }
             , Cmd.none
@@ -413,7 +490,7 @@ view model =
 
 
 viewGame : ScreenSize -> Game -> List (Html Msg)
-viewGame { width, height } { world, boostTank, focus } =
+viewGame { width, height } { world, boosts, boostTank, focus, lastTick } =
     let
         camera =
             let
@@ -500,7 +577,16 @@ viewGame { width, height } { world, boostTank, focus } =
                 }
 
         drawables =
-            List.map getTransformedDrawable (World.bodies (addWheelsToWorld world))
+            List.concat
+                [ addWheelsToWorld world
+                    |> World.bodies
+                    |> List.map getTransformedDrawable
+                , List.map
+                    (\( point, time ) ->
+                        renderBoost point (boostIsActive lastTick ( point, time ))
+                    )
+                    boosts
+                ]
 
         sunlight =
             Light.directional (Light.castsShadows True)
@@ -600,7 +686,7 @@ addWheelsToWorld world =
 
 
 wheelBody =
-    Scene3d.cylinder (Material.uniform Materials.chromium) wheelShape
+    Scene3d.cylinderWithShadow (Material.uniform Materials.chromium) wheelShape
 
 
 initialWorld : World Data
@@ -619,6 +705,30 @@ initialWorld =
         |> World.add (box (Point3d.meters 15 -17.5 2))
         |> World.add (box (Point3d.meters 15 -16.5 3))
         |> World.add ball
+
+
+renderBoost : Point3d Meters WorldCoordinates -> Bool -> Scene3d.Entity WorldCoordinates
+renderBoost point active =
+    let
+        length =
+            0.3
+
+        shape =
+            Cylinder3d.centeredOn point
+                Direction3d.z
+                { radius = Length.meters 0.75, length = Length.meters length }
+
+        glowingOrange =
+            Material.emissive (Light.color (Color.rgb255 255 127 0)) (Luminance.nits 5000)
+
+        material =
+            if active then
+                glowingOrange
+
+            else
+                Material.uniform Materials.chromium
+    in
+    Scene3d.cylinder material shape
 
 
 simulateCar : Duration -> Game -> List Wheel -> Body Data -> Body Data
@@ -1116,7 +1226,7 @@ base =
 
         entity =
             Scene3d.group
-                [ Scene3d.block material
+                [ Scene3d.blockWithShadow material
                     (Block3d.centeredOn Frame3d.atOrigin
                         ( Length.meters 3.2, Length.meters 2, Length.meters 0.5 )
                     )
@@ -1163,7 +1273,7 @@ ball =
             Sphere3d.atOrigin (Length.meters 2)
 
         entity =
-            Scene3d.sphere (Material.uniform Materials.chromium) shape
+            Scene3d.sphereWithShadow (Material.uniform Materials.chromium) shape
     in
     { id = Ball
     , entity = entity
