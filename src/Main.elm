@@ -401,8 +401,8 @@ update msg model =
                     Playing
                         { world =
                             initialWorld
-                                -- TODO: walls too
                                 |> World.add (floor texture)
+                                |> (\world -> List.foldl World.add world walls)
                         , rockets = False
                         , steering = 0
                         , speeding = 0
@@ -1401,6 +1401,32 @@ floor texture =
                     )
     in
     Body.plane { id = Obstacle, entity = Scene3d.group entities }
+
+
+walls : List (Body Data)
+walls =
+    List.map (Body.withBehavior Body.static)
+        [ Body.plane
+            { id = Obstacle
+            , entity =
+                Scene3d.quad
+                    (Material.uniform Materials.chromium)
+                    (Point3d.meters -75 -65 0)
+                    (Point3d.meters -75 -65 60)
+                    (Point3d.meters 75 -65 0)
+                    (Point3d.meters 75 -65 60)
+            }
+        , Body.plane
+            { id = Obstacle
+            , entity =
+                Scene3d.quad
+                    (Material.uniform Materials.chromium)
+                    (Point3d.meters 75 65 0)
+                    (Point3d.meters 75 65 60)
+                    (Point3d.meters -75 65 0)
+                    (Point3d.meters -75 65 60)
+            }
+        ]
 
 
 getTransformedDrawable : Body Data -> Scene3d.Entity WorldCoordinates
