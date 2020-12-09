@@ -1253,7 +1253,7 @@ base =
     -- TODO: better car shape
     let
         offset =
-            Point3d.meters -80 0 3
+            Point3d.meters -55 0 3
 
         shape =
             Block3d.centeredOn Frame3d.atOrigin
@@ -1336,7 +1336,9 @@ floor texture =
             Point3d.meters x y 0
 
         fullSize =
-            Length.inMeters floorSize
+            { width = Length.inMeters floorSize / 2
+            , length = Length.inMeters floorSize
+            }
 
         texturedMaterial =
             Material.texturedNonmetal
@@ -1348,37 +1350,34 @@ floor texture =
             10
 
         tileSize =
-            fullSize / tileCount
+            { width = fullSize.width / tileCount
+            , length = fullSize.length / tileCount
+            }
 
-        coords : List ( Int, Int )
+        coords : List ( Float, Float )
         coords =
-            List.range 0 tileCount
+            List.range 0 14
+                |> List.map (\x -> x * 10 - 75)
                 |> List.concatMap
                     (\x ->
-                        List.range 0 tileCount
-                            |> List.map (\y -> ( x, y ))
+                        List.range 0 13
+                            |> List.map (\y -> y * 10 - 65)
+                            |> List.map (\y -> ( toFloat x, toFloat y ))
                     )
 
         entities =
             -- TODO: is there an easier way to say "repeat texture every x pixels"?
             coords
                 |> List.map
-                    (\( first, second ) ->
-                        let
-                            ( x, y ) =
-                                ( toFloat first * tileSize, toFloat second * tileSize )
-                        in
+                    (\( x, y ) ->
                         Scene3d.quad texturedMaterial
                             (point x y)
-                            (point x (y + tileSize))
-                            (point (x + tileSize) (y + tileSize))
-                            (point (x + tileSize) y)
+                            (point x (y + 10))
+                            (point (x + 10) (y + 10))
+                            (point (x + 10) y)
                     )
     in
-    { id = Obstacle, entity = Scene3d.group entities }
-        |> Body.plane
-        |> Body.moveTo
-            (Point3d.meters (-fullSize / 2) (-fullSize / 2) 0)
+    Body.plane { id = Obstacle, entity = Scene3d.group entities }
 
 
 getTransformedDrawable : Body Data -> Scene3d.Entity WorldCoordinates
