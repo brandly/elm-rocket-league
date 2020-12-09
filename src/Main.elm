@@ -110,6 +110,7 @@ boostIsActive lastTick ( _, time ) =
 
 boostSettings =
     { reloadTime = 10000
+    , initial = 45
     , max = 100
     , refill = 12
     }
@@ -406,7 +407,7 @@ update msg model =
                         , steering = 0
                         , speeding = 0
                         , braking = False
-                        , boostTank = boostSettings.max
+                        , boostTank = boostSettings.initial
                         , focus = BallCam
                         , lastTick = 0
                         , boosts =
