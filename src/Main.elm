@@ -411,11 +411,53 @@ update msg model =
                         , focus = BallCam
                         , lastTick = 0
                         , boosts =
-                            List.range -10 10
+                            -- four surrounding center
+                            [ ( 15, 0 )
+                            , ( -15, 0 )
+                            , ( 0, 15 )
+                            , ( 0, -15 )
+
+                            -- center line
+                            , ( 40, 0 )
+                            , ( -40, 0 )
+                            , ( 60, 0 )
+                            , ( -60, 0 )
+
+                            --
+                            , ( -55, 30 )
+                            , ( -55, -30 )
+                            , ( 55, 30 )
+                            , ( 55, -30 )
+
+                            --
+                            , ( -50, 15 )
+                            , ( -50, -15 )
+                            , ( 50, 15 )
+                            , ( 50, -15 )
+
+                            --
+                            , ( -35, 30 )
+                            , ( -35, -30 )
+                            , ( -40, 55 )
+                            , ( -40, -55 )
+                            , ( 35, 30 )
+                            , ( 35, -30 )
+                            , ( 40, 55 )
+                            , ( 40, -55 )
+
+                            --
+                            , ( -15, 35 )
+                            , ( -15, -35 )
+                            , ( 15, 35 )
+                            , ( 15, -35 )
+                            ]
                                 |> List.map
-                                    (\n ->
-                                        ( Point3d.meters 0 (toFloat n * 10) 0, -boostSettings.reloadTime )
+                                    (\( x, y ) ->
+                                        ( Point3d.meters x y 0, -boostSettings.reloadTime )
                                     )
+
+                        --List.range -10 10
+                        --    |> List.map
                         }
               }
             , Cmd.none
