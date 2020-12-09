@@ -655,13 +655,36 @@ viewGame { width, height } { world, boosts, boostTank, focus, lastTick } =
         , clipDepth = meters 0.1
         , entities = drawables
         }
-    , Html.p
+    , Html.div
+        [ Html.Attributes.style "position" "fixed"
+        , Html.Attributes.style "bottom" "12px"
+        , Html.Attributes.style "left" "24px"
+        , Html.Attributes.style "padding" "0 12px"
+        , Html.Attributes.style "border-radius" "4px"
+        , Html.Attributes.style "background-color" "rgba(255,255,255, 0.5)"
+        ]
+        [ Html.p [] [ Html.text "Drive - Arrow keys" ]
+        , Html.p [] [ Html.text "Boost - Shift" ]
+        , Html.p [] [ Html.text "Toggle Camera - C" ]
+        , Html.p [] [ Html.text "Jump (buggy) - Spacebar" ]
+        ]
+    , Html.div
         [ Html.Attributes.style "position" "fixed"
         , Html.Attributes.style "bottom" "12px"
         , Html.Attributes.style "right" "24px"
-        , Html.Attributes.style "font-size" "48px"
+        , Html.Attributes.style "text-align" "right"
+        , Html.Attributes.style "padding" "6px 12px"
+        , Html.Attributes.style "border-radius" "4px"
+        , Html.Attributes.style "background-color" "rgba(255,255,255, 0.5)"
         ]
-        [ Html.text (String.fromInt (round boostTank)) ]
+        [ Html.p
+            [ Html.Attributes.style "font-size" "48px"
+            , Html.Attributes.style "margin" "0"
+            ]
+            [ Html.text (String.fromInt (round boostTank)) ]
+        , Html.p [ Html.Attributes.style "margin" "0" ]
+            [ Html.text "BOOST" ]
+        ]
     ]
 
 
