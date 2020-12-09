@@ -269,7 +269,6 @@ update msg model =
                     in
                     min boostSettings.max (toFloat (List.length consumingBoosts) * boostSettings.refill + boostTank)
             in
-            -- TODO: measure tick time instead of 1/60?
             ( keepPlaying
                 { game
                     | world =
@@ -288,7 +287,7 @@ update msg model =
                                                     else
                                                         identity
                                             in
-                                            simulateCar (Duration.seconds (1 / 60)) game wheels body
+                                            simulateCar (Duration.milliseconds tick) game wheels body
                                                 |> boost
 
                                         _ ->
