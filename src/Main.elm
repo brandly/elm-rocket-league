@@ -1284,7 +1284,7 @@ base =
 
         material =
             Material.nonmetal
-                { baseColor = Color.rgb255 0 0 0
+                { baseColor = Color.rgb255 0 180 180
                 , roughness = 0.5
                 }
 
