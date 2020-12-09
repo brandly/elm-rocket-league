@@ -47,8 +47,7 @@ type alias Data =
 
 
 type EntityId
-    = Arena
-    | Car (List Wheel)
+    = Car (List Wheel)
     | Ball
     | Obstacle
 
