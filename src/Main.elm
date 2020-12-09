@@ -1413,14 +1413,18 @@ walls =
                     Scene3d.quad
                         (Material.uniform Materials.chromium)
                         (Point3d.meters 0 0 0)
-                        (Point3d.meters 0 0 60)
+                        (Point3d.meters 0 60 0)
                         (Point3d.meters 150 0 0)
-                        (Point3d.meters 150 0 60)
+                        (Point3d.meters 150 60 0)
                 }
     in
     List.map (Body.withBehavior Body.static)
-        [ sideWall |> Body.moveTo (Point3d.meters -75 65 0)
-        , sideWall |> Body.moveTo (Point3d.meters -75 -65 0)
+        [ sideWall
+            |> Body.rotateAround Axis3d.x (Angle.degrees 90)
+            |> Body.translateBy (Vector3d.meters -75 65 0)
+        , sideWall
+            |> Body.rotateAround Axis3d.x (Angle.degrees -90)
+            |> Body.translateBy (Vector3d.meters -75 -65 60)
         ]
 
 
