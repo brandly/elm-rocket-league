@@ -632,9 +632,18 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
                                     |> Maybe.withDefault defaultAngle
                             , distance =
                                 Point3d.distanceFrom (frameOrigin ball_) (frameOrigin car_)
-                                    -- TODO: make this proportional to above distance. Quantity.times?
                                     |> Quantity.plus (Length.meters 30)
-                            , elevation = Angle.degrees 3
+                            , elevation =
+                                Direction3d.elevationFrom SketchPlane3d.xy
+                                    (Direction3d.from
+                                        (frameOrigin ball_
+                                            |> Point3d.translateBy (Vector3d.meters 0 0 -3)
+                                        )
+                                        (frameOrigin car_
+                                            |> Point3d.translateBy (Vector3d.meters 0 30 0)
+                                        )
+                                        |> Maybe.withDefault Direction3d.x
+                                    )
                             }
 
                         ( ForwardCam, Just ball_, Just car_ ) ->
