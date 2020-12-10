@@ -25,6 +25,7 @@ import Materials
 import Physics.Body as Body exposing (Body)
 import Physics.Constraint as Constraint exposing (Constraint)
 import Physics.Coordinates exposing (BodyCoordinates, WorldCoordinates)
+import Physics.Material
 import Physics.World as World exposing (World)
 import Pixels exposing (pixels)
 import Point3d exposing (Point3d)
@@ -1343,8 +1344,9 @@ ball =
     , entity = entity
     }
         |> Body.sphere shape
-        |> Body.withBehavior (Body.dynamic (Mass.kilograms 50))
-        |> Body.moveTo (Point3d.meters 0 0 5)
+        |> Body.withMaterial (Physics.Material.custom { friction = 0.3, bounciness = 0.8 })
+        |> Body.withBehavior (Body.dynamic (Mass.kilograms 1))
+        |> Body.moveTo (Point3d.meters 0 0 2)
 
 
 floorSize : Length
