@@ -456,9 +456,6 @@ update msg model =
                                     (\( x, y ) ->
                                         ( Point3d.meters x y 0, -boostSettings.reloadTime )
                                     )
-
-                        --List.range -10 10
-                        --    |> List.map
                         }
               }
             , Cmd.none
