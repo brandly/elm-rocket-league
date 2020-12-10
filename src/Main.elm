@@ -664,6 +664,28 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
             List.concat
                 [ addWheelsToWorld world
                     |> World.bodies
+                    |> List.filter
+                        (\body ->
+                            case (Body.data body).id of
+                                Obstacle ->
+                                    let
+                                        eye =
+                                            Direction3d.from
+                                                (Viewpoint3d.eyePoint (Camera3d.viewpoint camera))
+                                                (Body.originPoint body)
+                                                |> Maybe.withDefault Direction3d.z
+
+                                        wall =
+                                            Body.frame body
+                                                |> Frame3d.zDirection
+                                    in
+                                    Direction3d.angleFrom eye wall
+                                        |> Angle.inDegrees
+                                        |> (\angle -> angle > 90)
+
+                                _ ->
+                                    True
+                        )
                     |> List.map getTransformedDrawable
                 , List.map
                     (\{ point, time, size } ->
