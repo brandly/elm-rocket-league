@@ -779,7 +779,7 @@ addWheelsToWorld world =
                     in
                     World.add
                         (Body.cylinder wheelShape
-                            { id = Obstacle
+                            { id = Car []
                             , entity = wheelBody
                             }
                             |> Body.placeIn newFrame
