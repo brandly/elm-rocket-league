@@ -100,8 +100,20 @@ type alias Game =
     , boostTank : Float
     , focus : CameraFocus
     , lastTick : Float
-    , boosts : List ( Point3d Meters WorldCoordinates, Float )
+    , refills : List Refill
     }
+
+
+type alias Refill =
+    { point : Point3d Meters WorldCoordinates
+    , time : Float
+    , size : RefillSize
+    }
+
+
+type RefillSize
+    = FullRefill
+    | SmallRefill
 
 
 boostIsActive : Float -> ( Point3d Meters WorldCoordinates, Float ) -> Bool
@@ -246,11 +258,11 @@ update msg model =
                 fullTank =
                     game.boostTank >= boostSettings.max
 
-                carHits : ( Point3d Meters WorldCoordinates, Float ) -> Bool
-                carHits ( boostPoint, boostTime ) =
+                carHits : Refill -> Bool
+                carHits { point, time } =
                     not fullTank
-                        && ((game.lastTick - boostTime) > boostSettings.reloadTime)
-                        && (Point3d.distanceFrom carPoint boostPoint |> Length.inMeters)
+                        && ((game.lastTick - time) > boostSettings.reloadTime)
+                        && (Point3d.distanceFrom carPoint point |> Length.inMeters)
                         < 2.5
 
                 currentTick =
@@ -263,12 +275,23 @@ update msg model =
                     else
                         boostTank
 
-                applyConsumedBoosts boostTank =
+                applyRefills boostTank =
                     let
-                        consumingBoosts =
-                            List.filter carHits game.boosts
+                        adding =
+                            game.refills
+                                |> List.filter carHits
+                                |> List.map
+                                    (\refill ->
+                                        case refill.size of
+                                            FullRefill ->
+                                                boostSettings.max
+
+                                            SmallRefill ->
+                                                boostSettings.refill
+                                    )
+                                |> List.sum
                     in
-                    min boostSettings.max (toFloat (List.length consumingBoosts) * boostSettings.refill + boostTank)
+                    min boostSettings.max (adding + boostTank)
             in
             ( keepPlaying
                 { game
@@ -297,18 +320,18 @@ update msg model =
                             |> World.simulate (Duration.seconds (1 / 60))
                     , boostTank =
                         game.boostTank
-                            |> applyConsumedBoosts
+                            |> applyRefills
                             |> applyRockets
                     , lastTick = currentTick
-                    , boosts =
-                        game.boosts
+                    , refills =
+                        game.refills
                             |> List.map
-                                (\( boostPoint, t ) ->
-                                    if carHits ( boostPoint, t ) then
-                                        ( boostPoint, currentTick )
+                                (\refill ->
+                                    if carHits refill then
+                                        { refill | time = currentTick }
 
                                     else
-                                        ( boostPoint, t )
+                                        refill
                                 )
                 }
             , Cmd.none
@@ -411,51 +434,73 @@ update msg model =
                         , boostTank = boostSettings.initial
                         , focus = BallCam
                         , lastTick = 0
-                        , boosts =
-                            -- four surrounding center
-                            [ ( 15, 0 )
-                            , ( -15, 0 )
-                            , ( 0, 15 )
-                            , ( 0, -15 )
+                        , refills =
+                            List.concat
+                                [ -- four surrounding center
+                                  [ ( 15, 0 )
+                                  , ( -15, 0 )
+                                  , ( 0, 15 )
+                                  , ( 0, -15 )
 
-                            -- center line
-                            , ( 40, 0 )
-                            , ( -40, 0 )
-                            , ( 60, 0 )
-                            , ( -60, 0 )
+                                  -- center line
+                                  , ( 40, 0 )
+                                  , ( -40, 0 )
+                                  , ( 60, 0 )
+                                  , ( -60, 0 )
 
-                            --
-                            , ( -55, 30 )
-                            , ( -55, -30 )
-                            , ( 55, 30 )
-                            , ( 55, -30 )
+                                  --
+                                  , ( -55, 30 )
+                                  , ( -55, -30 )
+                                  , ( 55, 30 )
+                                  , ( 55, -30 )
 
-                            --
-                            , ( -50, 15 )
-                            , ( -50, -15 )
-                            , ( 50, 15 )
-                            , ( 50, -15 )
+                                  --
+                                  , ( -50, 15 )
+                                  , ( -50, -15 )
+                                  , ( 50, 15 )
+                                  , ( 50, -15 )
 
-                            --
-                            , ( -35, 30 )
-                            , ( -35, -30 )
-                            , ( -40, 55 )
-                            , ( -40, -55 )
-                            , ( 35, 30 )
-                            , ( 35, -30 )
-                            , ( 40, 55 )
-                            , ( 40, -55 )
+                                  --
+                                  , ( -35, 30 )
+                                  , ( -35, -30 )
+                                  , ( -40, 55 )
+                                  , ( -40, -55 )
+                                  , ( 35, 30 )
+                                  , ( 35, -30 )
+                                  , ( 40, 55 )
+                                  , ( 40, -55 )
 
-                            --
-                            , ( -15, 35 )
-                            , ( -15, -35 )
-                            , ( 15, 35 )
-                            , ( 15, -35 )
-                            ]
-                                |> List.map
-                                    (\( x, y ) ->
-                                        ( Point3d.meters x y 0, -boostSettings.reloadTime )
-                                    )
+                                  --
+                                  , ( -15, 35 )
+                                  , ( -15, -35 )
+                                  , ( 15, 35 )
+                                  , ( 15, -35 )
+                                  ]
+                                    |> List.map
+                                        (\( x, y ) ->
+                                            { point = Point3d.meters x y 0
+                                            , time = -boostSettings.reloadTime
+                                            , size = SmallRefill
+                                            }
+                                        )
+                                , [ -- center sideline
+                                    ( 0, 60 )
+                                  , ( 0, -60 )
+                                  , --
+                                    ( -60, 60 )
+                                  , ( -60, -60 )
+                                  , --
+                                    ( 60, 60 )
+                                  , ( 60, -60 )
+                                  ]
+                                    |> List.map
+                                        (\( x, y ) ->
+                                            { point = Point3d.meters x y 0
+                                            , time = -boostSettings.reloadTime
+                                            , size = FullRefill
+                                            }
+                                        )
+                                ]
                         }
               }
             , Cmd.none
@@ -529,7 +574,7 @@ view model =
 
 
 viewGame : ScreenSize -> Game -> List (Html Msg)
-viewGame { width, height } { world, boosts, boostTank, focus, lastTick } =
+viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
     let
         camera =
             let
@@ -621,10 +666,10 @@ viewGame { width, height } { world, boosts, boostTank, focus, lastTick } =
                     |> World.bodies
                     |> List.map getTransformedDrawable
                 , List.map
-                    (\( point, time ) ->
-                        renderBoost point (boostIsActive lastTick ( point, time ))
+                    (\{ point, time, size } ->
+                        renderRefill point (boostIsActive lastTick ( point, time )) size
                     )
-                    boosts
+                    refills
                 ]
 
         sunlight =
@@ -769,16 +814,13 @@ initialWorld =
         |> World.add ball
 
 
-renderBoost : Point3d Meters WorldCoordinates -> Bool -> Scene3d.Entity WorldCoordinates
-renderBoost point active =
+renderRefill : Point3d Meters WorldCoordinates -> Bool -> RefillSize -> Scene3d.Entity WorldCoordinates
+renderRefill point active size =
     let
-        length =
-            0.3
-
         shape =
             Cylinder3d.centeredOn point
                 Direction3d.z
-                { radius = Length.meters 0.75, length = Length.meters length }
+                { radius = Length.meters 0.75, length = Length.meters 0.3 }
 
         glowingOrange =
             Material.emissive (Light.color (Color.rgb255 255 127 0)) (Luminance.nits 5000)
@@ -790,7 +832,20 @@ renderBoost point active =
             else
                 Material.uniform Materials.chromium
     in
-    Scene3d.cylinder material shape
+    case ( size, active ) of
+        ( FullRefill, True ) ->
+            let
+                orbPosition =
+                    Point3d.translateBy (Vector3d.meters 0 0 1.5) point
+            in
+            Scene3d.group
+                [ Scene3d.cylinder material shape
+                , Scene3d.sphere material
+                    (Sphere3d.atPoint orbPosition (Length.meters 0.6))
+                ]
+
+        _ ->
+            Scene3d.cylinder material shape
 
 
 simulateCar : Duration -> Game -> List Wheel -> Body Data -> Body Data
