@@ -1468,8 +1468,8 @@ walls =
                         (Material.uniform Materials.chromium)
                         (Point3d.meters 0 0 0)
                         (Point3d.meters 0 60 0)
-                        (Point3d.meters length 0 0)
                         (Point3d.meters length 60 0)
+                        (Point3d.meters length 0 0)
                 }
 
         sideWall =
