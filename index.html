@@ -9804,6 +9804,8 @@ var $author$project$Materials$chromium = $ianmackenzie$elm_3d_scene$Scene3d$Mate
 		cM: A3($avh4$elm_color$Color$rgb255, 140, 142, 141),
 		dD: 0.5
 	});
+var $author$project$Internal$Material$Protected = $elm$core$Basics$identity;
+var $author$project$Physics$Material$custom = $elm$core$Basics$identity;
 var $author$project$Physics$Body$Dynamic = function (a) {
 	return {$: 0, a: a};
 };
@@ -11573,6 +11575,14 @@ var $author$project$Physics$Body$withBehavior = F2(
 					{c8: 0}));
 		}
 	});
+var $author$project$Physics$Body$withMaterial = F2(
+	function (_v0, _v1) {
+		var material = _v0;
+		var body = _v1;
+		return _Utils_update(
+			body,
+			{ex: material});
+	});
 var $author$project$Main$ball = function () {
 	var shape = $ianmackenzie$elm_geometry$Sphere3d$atOrigin(
 		$ianmackenzie$elm_units$Length$meters(2));
@@ -11582,15 +11592,19 @@ var $author$project$Main$ball = function () {
 		shape);
 	return A2(
 		$author$project$Physics$Body$moveTo,
-		A3($ianmackenzie$elm_geometry$Point3d$meters, 0, 0, 5),
+		A3($ianmackenzie$elm_geometry$Point3d$meters, 0, 0, 2),
 		A2(
 			$author$project$Physics$Body$withBehavior,
 			$author$project$Physics$Body$dynamic(
-				$ianmackenzie$elm_units$Mass$kilograms(50)),
+				$ianmackenzie$elm_units$Mass$kilograms(1)),
 			A2(
-				$author$project$Physics$Body$sphere,
-				shape,
-				{ad: entity, ec: $author$project$Main$Ball})));
+				$author$project$Physics$Body$withMaterial,
+				$author$project$Physics$Material$custom(
+					{b5: 0.8, ce: 0.3}),
+				A2(
+					$author$project$Physics$Body$sphere,
+					shape,
+					{ad: entity, ec: $author$project$Main$Ball}))));
 }();
 var $author$project$Main$Car = function (a) {
 	return {$: 0, a: a};
@@ -12627,7 +12641,7 @@ var $author$project$Main$base = function () {
 			$ianmackenzie$elm_units$Length$meters(3.2),
 			$ianmackenzie$elm_units$Length$meters(2),
 			$ianmackenzie$elm_units$Length$meters(0.5)));
-	var offset = A3($ianmackenzie$elm_geometry$Point3d$meters, -55, 0, 3);
+	var offset = A3($ianmackenzie$elm_geometry$Point3d$meters, -35, 0, 3);
 	var material = $ianmackenzie$elm_3d_scene$Scene3d$Material$nonmetal(
 		{
 			cM: A3($avh4$elm_color$Color$rgb255, 0, 180, 180),
@@ -15949,18 +15963,23 @@ var $author$project$Physics$Body$translateBy = F2(
 			});
 	});
 var $ianmackenzie$elm_geometry$Axis3d$x = A2($ianmackenzie$elm_geometry$Axis3d$through, $ianmackenzie$elm_geometry$Point3d$origin, $ianmackenzie$elm_geometry$Direction3d$x);
+var $ianmackenzie$elm_geometry$Axis3d$y = A2($ianmackenzie$elm_geometry$Axis3d$through, $ianmackenzie$elm_geometry$Point3d$origin, $ianmackenzie$elm_geometry$Direction3d$y);
 var $author$project$Main$walls = function () {
-	var sideWall = $author$project$Physics$Body$plane(
-		{
-			ad: A5(
-				$ianmackenzie$elm_3d_scene$Scene3d$quad,
-				$ianmackenzie$elm_3d_scene$Scene3d$Material$uniform($author$project$Materials$chromium),
-				A3($ianmackenzie$elm_geometry$Point3d$meters, 0, 0, 0),
-				A3($ianmackenzie$elm_geometry$Point3d$meters, 0, 60, 0),
-				A3($ianmackenzie$elm_geometry$Point3d$meters, 150, 0, 0),
-				A3($ianmackenzie$elm_geometry$Point3d$meters, 150, 60, 0)),
-			ec: $author$project$Main$Obstacle
-		});
+	var buildWall = function (length) {
+		return $author$project$Physics$Body$plane(
+			{
+				ad: A5(
+					$ianmackenzie$elm_3d_scene$Scene3d$quad,
+					$ianmackenzie$elm_3d_scene$Scene3d$Material$uniform($author$project$Materials$chromium),
+					A3($ianmackenzie$elm_geometry$Point3d$meters, 0, 0, 0),
+					A3($ianmackenzie$elm_geometry$Point3d$meters, 0, 60, 0),
+					A3($ianmackenzie$elm_geometry$Point3d$meters, length, 0, 0),
+					A3($ianmackenzie$elm_geometry$Point3d$meters, length, 60, 0)),
+				ec: $author$project$Main$Obstacle
+			});
+	};
+	var frontBackWall = buildWall(130);
+	var sideWall = buildWall(150);
 	return A2(
 		$elm$core$List$map,
 		$author$project$Physics$Body$withBehavior($author$project$Physics$Body$static),
@@ -15981,7 +16000,31 @@ var $author$project$Main$walls = function () {
 					$author$project$Physics$Body$rotateAround,
 					$ianmackenzie$elm_geometry$Axis3d$x,
 					$ianmackenzie$elm_units$Angle$degrees(-90),
-					sideWall))
+					sideWall)),
+				A2(
+				$author$project$Physics$Body$translateBy,
+				A3($ianmackenzie$elm_geometry$Vector3d$meters, -75, -65, 0),
+				A3(
+					$author$project$Physics$Body$rotateAround,
+					$ianmackenzie$elm_geometry$Axis3d$y,
+					$ianmackenzie$elm_units$Angle$degrees(90),
+					A3(
+						$author$project$Physics$Body$rotateAround,
+						$ianmackenzie$elm_geometry$Axis3d$x,
+						$ianmackenzie$elm_units$Angle$degrees(90),
+						frontBackWall))),
+				A2(
+				$author$project$Physics$Body$translateBy,
+				A3($ianmackenzie$elm_geometry$Vector3d$meters, 75, 65, 0),
+				A3(
+					$author$project$Physics$Body$rotateAround,
+					$ianmackenzie$elm_geometry$Axis3d$y,
+					$ianmackenzie$elm_units$Angle$degrees(-90),
+					A3(
+						$author$project$Physics$Body$rotateAround,
+						$ianmackenzie$elm_geometry$Axis3d$x,
+						$ianmackenzie$elm_units$Angle$degrees(90),
+						frontBackWall)))
 			]));
 }();
 var $author$project$Main$update = F2(
