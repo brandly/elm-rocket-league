@@ -3,7 +3,7 @@
     "start": "elm reactor",
     "build": "elm make src/Main.elm",
     "test": "elm-analyse && npm run build -- --optimize",
-    "deploy": "npm run build -- --optimize && mkdir -p dist && mv index.html dist && gcp --parents -r static dist && gh-pages --dist dist/"
+    "deploy": "npm run build -- --optimize && mkdir -p dist/static && mv index.html dist && cp src/static/* dist/static && gh-pages --dist dist/"
   },
   "devDependencies": {
     "elm": "0.19.1-3",
