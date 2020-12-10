@@ -671,8 +671,8 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
                                     let
                                         eye =
                                             Direction3d.from
-                                                (Viewpoint3d.eyePoint (Camera3d.viewpoint camera))
                                                 (Body.originPoint body)
+                                                (Viewpoint3d.eyePoint (Camera3d.viewpoint camera))
                                                 |> Maybe.withDefault Direction3d.z
 
                                         wall =
@@ -681,7 +681,7 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
                                     in
                                     Direction3d.angleFrom eye wall
                                         |> Angle.inDegrees
-                                        |> (\angle -> angle > 90)
+                                        |> (\angle -> angle < 90)
 
                                 _ ->
                                     True
