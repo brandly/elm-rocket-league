@@ -1277,7 +1277,7 @@ base =
     -- TODO: better car shape
     let
         offset =
-            Point3d.meters -55 0 3
+            Point3d.meters -35 0 3
 
         shape =
             Block3d.centeredOn Frame3d.atOrigin
@@ -1408,7 +1408,7 @@ floor texture =
 walls : List (Body Data)
 walls =
     let
-        sideWall =
+        buildWall length =
             Body.plane
                 { id = Obstacle
                 , entity =
@@ -1416,9 +1416,15 @@ walls =
                         (Material.uniform Materials.chromium)
                         (Point3d.meters 0 0 0)
                         (Point3d.meters 0 60 0)
-                        (Point3d.meters 150 0 0)
-                        (Point3d.meters 150 60 0)
+                        (Point3d.meters length 0 0)
+                        (Point3d.meters length 60 0)
                 }
+
+        sideWall =
+            buildWall 150
+
+        frontBackWall =
+            buildWall 130
     in
     List.map (Body.withBehavior Body.static)
         [ sideWall
@@ -1427,6 +1433,14 @@ walls =
         , sideWall
             |> Body.rotateAround Axis3d.x (Angle.degrees -90)
             |> Body.translateBy (Vector3d.meters -75 -65 60)
+        , frontBackWall
+            |> Body.rotateAround Axis3d.x (Angle.degrees 90)
+            |> Body.rotateAround Axis3d.y (Angle.degrees 90)
+            |> Body.translateBy (Vector3d.meters -75 -65 0)
+        , frontBackWall
+            |> Body.rotateAround Axis3d.x (Angle.degrees 90)
+            |> Body.rotateAround Axis3d.y (Angle.degrees -90)
+            |> Body.translateBy (Vector3d.meters 75 65 0)
         ]
 
 
