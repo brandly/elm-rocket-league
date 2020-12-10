@@ -621,39 +621,49 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
                 defaultPoint =
                     Point3d.meters 0 0 0
 
-                ( focalPoint, azimuth, distance ) =
+                { focalPoint, azimuth, distance, elevation } =
                     case ( focus, ballBody, car ) of
                         ( BallCam, Just ball_, Just car_ ) ->
-                            ( -- Focus on the ball
-                              frameOrigin ball_
-                            , Direction3d.from (frameOrigin ball_) (frameOrigin car_)
-                                |> Maybe.map (Direction3d.azimuthIn SketchPlane3d.xy)
-                                |> Maybe.withDefault defaultAngle
-                            , Point3d.distanceFrom (frameOrigin ball_) (frameOrigin car_)
-                                |> Quantity.plus (Length.meters 30)
-                            )
+                            { -- Focus on the ball
+                              focalPoint = frameOrigin ball_
+                            , azimuth =
+                                Direction3d.from (frameOrigin ball_) (frameOrigin car_)
+                                    |> Maybe.map (Direction3d.azimuthIn SketchPlane3d.xy)
+                                    |> Maybe.withDefault defaultAngle
+                            , distance =
+                                Point3d.distanceFrom (frameOrigin ball_) (frameOrigin car_)
+                                    -- TODO: make this proportional to above distance. Quantity.times?
+                                    |> Quantity.plus (Length.meters 30)
+                            , elevation = Angle.degrees 3
+                            }
 
                         ( ForwardCam, Just ball_, Just car_ ) ->
-                            ( -- Focus on a point meters above the car
-                              frameOrigin car_
-                                |> Point3d.translateBy (Vector3d.meters 0 0 4)
-                            , -- Look the direction the car is pointing
-                              Direction3d.placeIn (Body.frame car_) carSettings.forwardDirection
-                                |> Direction3d.reverse
-                                |> Direction3d.azimuthIn
-                                    SketchPlane3d.xy
-                            , Quantity 30
-                            )
+                            { -- Focus on a point meters above the car
+                              focalPoint =
+                                frameOrigin car_
+                                    |> Point3d.translateBy (Vector3d.meters 0 0 4)
+
+                            -- Look the direction the car is moving
+                            , azimuth =
+                                Body.velocity car_
+                                    |> Vector3d.direction
+                                    |> Maybe.withDefault Direction3d.x
+                                    |> Direction3d.reverse
+                                    |> Direction3d.azimuthIn
+                                        SketchPlane3d.xy
+                            , distance = Quantity 30
+                            , elevation = Angle.degrees 3
+                            }
 
                         _ ->
-                            ( defaultPoint, defaultAngle, Quantity 30 )
+                            { focalPoint = defaultPoint, azimuth = defaultAngle, distance = Quantity 30, elevation = defaultAngle }
             in
             Camera3d.perspective
                 { viewpoint =
                     Viewpoint3d.orbit
                         { focalPoint = focalPoint
                         , azimuth = azimuth
-                        , elevation = Angle.degrees 3
+                        , elevation = elevation
                         , distance = distance
                         , groundPlane = SketchPlane3d.xy
                         }
