@@ -1366,9 +1366,11 @@ base =
         offset =
             Point3d.meters -35 0 3
 
+        size =
+            ( Length.meters 2.8, Length.meters 2, Length.meters 0.5 )
+
         shape =
-            Block3d.centeredOn Frame3d.atOrigin
-                ( Length.meters 3.2, Length.meters 2, Length.meters 0.5 )
+            Block3d.centeredOn Frame3d.atOrigin size
 
         material =
             Material.nonmetal
@@ -1379,24 +1381,21 @@ base =
         entity =
             Scene3d.group
                 [ Scene3d.blockWithShadow material
-                    (Block3d.centeredOn Frame3d.atOrigin
-                        ( Length.meters 3.2, Length.meters 2, Length.meters 0.5 )
+                    (Block3d.centeredOn Frame3d.atOrigin size)
+                , Scene3d.block material
+                    (Block3d.centeredOn
+                        (Frame3d.atOrigin
+                            |> Frame3d.translateBy
+                                (Vector3d.withLength (Length.meters 0.5)
+                                    (Frame3d.zDirection Frame3d.atOrigin)
+                                )
+                            |> Frame3d.translateBy
+                                (Vector3d.withLength (Length.meters -0.3)
+                                    (Frame3d.xDirection Frame3d.atOrigin)
+                                )
+                        )
+                        ( Length.meters 2.2, Length.meters 1.8, Length.meters 0.5 )
                     )
-
-                --, Scene3d.block material
-                --    (Block3d.centeredOn
-                --        (Frame3d.atOrigin
-                --            |> Frame3d.translateBy
-                --                (Vector3d.withLength (Length.meters 0.5)
-                --                    (Frame3d.zDirection Frame3d.atOrigin)
-                --                )
-                --            |> Frame3d.translateBy
-                --                (Vector3d.withLength (Length.meters -0.3)
-                --                    (Frame3d.xDirection Frame3d.atOrigin)
-                --                )
-                --        )
-                --        ( Length.meters 2.5, Length.meters 1.8, Length.meters 0.5 )
-                --    )
                 ]
 
         wheels =
