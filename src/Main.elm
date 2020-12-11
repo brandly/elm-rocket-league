@@ -206,6 +206,7 @@ type alias Model =
 
 type Status
     = Loading
+    | LoadingError String
     | Playing Game
 
 
@@ -507,11 +508,24 @@ update msg model =
             )
 
         ( Loading, TextureResponse (Err err) ) ->
-            ( Debug.log (Debug.toString err) <| model
+            ( { model
+                | status =
+                    LoadingError
+                        (case err of
+                            WebGL.Texture.LoadError ->
+                                "Load error"
+
+                            WebGL.Texture.SizeError x y ->
+                                "Image not powers of 2: " ++ String.fromInt x ++ " " ++ String.fromInt y
+                        )
+              }
             , Cmd.none
             )
 
         ( Loading, _ ) ->
+            ( model, Cmd.none )
+
+        ( LoadingError _, _ ) ->
             ( model, Cmd.none )
 
 
@@ -570,6 +584,9 @@ view model =
 
             Playing game ->
                 viewGame model.screenSize game
+
+            LoadingError error ->
+                [ Html.p [] [ Html.text ("Error: " ++ error) ] ]
         )
 
 
