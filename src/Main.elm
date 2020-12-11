@@ -216,7 +216,7 @@ init _ =
     , Cmd.batch
         [ Task.attempt TextureResponse <|
             Material.loadWith Material.trilinearFiltering
-                "static/floor-tile.jpg"
+                "static/rl-map.png"
         , Task.perform (\{ viewport } -> Resize viewport.width viewport.height)
             Dom.getViewport
         ]
@@ -421,6 +421,10 @@ update msg model =
             ( model, Cmd.none )
 
         ( Loading, TextureResponse (Ok texture) ) ->
+            let
+                measure =
+                    roomSize.length / 12
+            in
             ( { model
                 | status =
                     Playing
@@ -438,44 +442,46 @@ update msg model =
                         , refills =
                             List.concat
                                 [ -- four surrounding center
-                                  [ ( 15, 0 )
-                                  , ( -15, 0 )
-                                  , ( 0, 15 )
-                                  , ( 0, -15 )
+                                  [ ( measure, 0 )
+                                  , ( -measure, 0 )
+                                  , ( 0, measure )
+                                  , ( 0, -measure )
 
                                   -- center line
-                                  , ( 40, 0 )
-                                  , ( -40, 0 )
-                                  , ( 60, 0 )
-                                  , ( -60, 0 )
+                                  , ( measure * 2.7, 0 )
+                                  , ( -measure * 2.7, 0 )
+                                  , ( measure * 4.1, 0 )
+                                  , ( -measure * 4.1, 0 )
 
                                   --
-                                  , ( -55, 30 )
-                                  , ( -55, -30 )
-                                  , ( 55, 30 )
-                                  , ( 55, -30 )
+                                  , ( -measure * 4.05, measure * 1.75 )
+                                  , ( -measure * 4.05, -measure * 1.75 )
+                                  , ( measure * 4.05, measure * 1.75 )
+                                  , ( measure * 4.05, -measure * 1.75 )
 
                                   --
-                                  , ( -50, 15 )
-                                  , ( -50, -15 )
-                                  , ( 50, 15 )
-                                  , ( 50, -15 )
+                                  , ( -measure * 3.2, measure * 0.9 )
+                                  , ( -measure * 3.2, -measure * 0.9 )
+                                  , ( measure * 3.2, measure * 0.9 )
+                                  , ( measure * 3.2, -measure * 0.9 )
 
                                   --
-                                  , ( -35, 30 )
-                                  , ( -35, -30 )
-                                  , ( -40, 55 )
-                                  , ( -40, -55 )
-                                  , ( 35, 30 )
-                                  , ( 35, -30 )
-                                  , ( 40, 55 )
-                                  , ( 40, -55 )
+                                  , ( -measure * 2.2, measure * 1.75 )
+                                  , ( -measure * 2.2, -measure * 1.75 )
+                                  , ( measure * 2.2, measure * 1.75 )
+                                  , ( measure * 2.2, -measure * 1.75 )
 
                                   --
-                                  , ( -15, 35 )
-                                  , ( -15, -35 )
-                                  , ( 15, 35 )
-                                  , ( 15, -35 )
+                                  , ( -measure * 2.4, measure * 3.4 )
+                                  , ( -measure * 2.4, -measure * 3.4 )
+                                  , ( measure * 2.4, measure * 3.4 )
+                                  , ( measure * 2.4, -measure * 3.4 )
+
+                                  --
+                                  , ( -measure, measure * 2.0 )
+                                  , ( -measure, -measure * 2.0 )
+                                  , ( measure, measure * 2.0 )
+                                  , ( measure, -measure * 2.0 )
                                   ]
                                     |> List.map
                                         (\( x, y ) ->
@@ -485,14 +491,14 @@ update msg model =
                                             }
                                         )
                                 , [ -- center sideline
-                                    ( 0, 60 )
-                                  , ( 0, -60 )
+                                    ( 0, measure * 3.6 )
+                                  , ( 0, -measure * 3.6 )
                                   , --
-                                    ( -60, 60 )
-                                  , ( -60, -60 )
+                                    ( -measure * 4, measure * 3 )
+                                  , ( -measure * 4, -measure * 3 )
                                   , --
-                                    ( 60, 60 )
-                                  , ( 60, -60 )
+                                    ( measure * 4, measure * 3 )
+                                  , ( measure * 4, -measure * 3 )
                                   ]
                                     |> List.map
                                         (\( x, y ) ->
@@ -1499,13 +1505,25 @@ floor texture =
                             (point (x + 10) (y + 10))
                             (point (x + 10) y)
                     )
+
+        half =
+            roomSize.length / 2
     in
-    Body.plane { id = Obstacle, entity = Scene3d.group entities }
+    Body.plane
+        { id = Obstacle
+        , --entity = Scene3d.group entities
+          entity =
+            Scene3d.quad texturedMaterial
+                (point -half -half)
+                (point -half half)
+                (point half half)
+                (point half -half)
+        }
 
 
 roomSize =
     { width = 144
-    , length = 150
+    , length = 180
     , height = 60
     }
 
