@@ -688,19 +688,14 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
                             case (Body.data body).id of
                                 Obstacle ->
                                     let
-                                        eye =
-                                            Direction3d.from
-                                                (Body.originPoint body)
-                                                (Viewpoint3d.eyePoint (Camera3d.viewpoint camera))
-                                                |> Maybe.withDefault Direction3d.z
+                                        eyePoint =
+                                            Viewpoint3d.eyePoint (Camera3d.viewpoint camera)
 
-                                        wall =
-                                            Body.frame body
-                                                |> Frame3d.zDirection
+                                        wallPlane =
+                                            Frame3d.xyPlane (Body.frame body)
                                     in
-                                    Direction3d.angleFrom eye wall
-                                        |> Angle.inDegrees
-                                        |> (\angle -> angle < 90)
+                                    Point3d.signedDistanceFrom wallPlane eyePoint
+                                        |> Quantity.greaterThan Quantity.zero
 
                                 _ ->
                                     True
