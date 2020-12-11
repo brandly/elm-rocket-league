@@ -1522,7 +1522,7 @@ floor texture =
 
 
 roomSize =
-    { width = 144
+    { width = 131
     , length = 180
     , height = 60
     }
@@ -1543,11 +1543,15 @@ walls =
                         (Point3d.meters length 0 0)
                 }
 
+        len =
+            -- TODO: get a grip on these dimensions
+            roomSize.length - 19
+
         buildWall =
             buildPlane roomSize.height
 
         sideWall =
-            buildWall roomSize.length
+            buildWall len
 
         frontBackWall =
             buildWall roomSize.width
@@ -1558,18 +1562,18 @@ walls =
     List.map (Body.withBehavior Body.static)
         ([ sideWall
             |> Body.rotateAround Axis3d.x (Angle.degrees 90)
-            |> Body.translateBy (Vector3d.meters -(roomSize.length / 2) (roomSize.width / 2) 0)
+            |> Body.translateBy (Vector3d.meters -(len / 2) (roomSize.width / 2) 0)
          , sideWall
             |> Body.rotateAround Axis3d.x (Angle.degrees -90)
-            |> Body.translateBy (Vector3d.meters -(roomSize.length / 2) -(roomSize.width / 2) 60)
+            |> Body.translateBy (Vector3d.meters -(len / 2) -(roomSize.width / 2) 60)
          , frontBackWall
             |> Body.rotateAround Axis3d.x (Angle.degrees 90)
             |> Body.rotateAround Axis3d.y (Angle.degrees 90)
-            |> Body.translateBy (Vector3d.meters -(roomSize.length / 2) -(roomSize.width / 2) 0)
+            |> Body.translateBy (Vector3d.meters -(len / 2) -(roomSize.width / 2) 0)
          , frontBackWall
             |> Body.rotateAround Axis3d.x (Angle.degrees 90)
             |> Body.rotateAround Axis3d.y (Angle.degrees -90)
-            |> Body.translateBy (Vector3d.meters (roomSize.length / 2) (roomSize.width / 2) 0)
+            |> Body.translateBy (Vector3d.meters (len / 2) (roomSize.width / 2) 0)
          ]
             -- left pipe
             ++ (List.range 1 (stepCount - 1)
@@ -1580,10 +1584,10 @@ walls =
                                 angle =
                                     (90 / stepCount) * step
                             in
-                            buildPlane 2 roomSize.length
+                            buildPlane 2 len
                                 -- move to center of quarter-pipe
                                 |> Body.translateBy
-                                    (Vector3d.meters (-roomSize.length / 2) (roomSize.width / 2 - slopeRadius) slopeRadius)
+                                    (Vector3d.meters (-len / 2) (roomSize.width / 2 - slopeRadius) slopeRadius)
                                 |> Body.translateBy
                                     (Vector3d.meters 0
                                         (sin (degrees angle) * slopeRadius)
@@ -1603,10 +1607,10 @@ walls =
                                 angle =
                                     (90 / stepCount) * step
                             in
-                            buildPlane 2 roomSize.length
+                            buildPlane 2 len
                                 -- move to center of quarter-pipe
                                 |> Body.translateBy
-                                    (Vector3d.meters (-roomSize.length / 2) (-roomSize.width / 2 + slopeRadius) slopeRadius)
+                                    (Vector3d.meters (-len / 2) (-roomSize.width / 2 + slopeRadius) slopeRadius)
                                 |> Body.translateBy
                                     (Vector3d.meters 0
                                         (sin (degrees angle) * slopeRadius * -1)
@@ -1630,7 +1634,7 @@ walls =
                                 -- move to center of quarter-pipe
                                 |> Body.rotateAround Axis3d.z (Angle.degrees 90)
                                 |> Body.translateBy
-                                    (Vector3d.meters (roomSize.length / 2 - slopeRadius) (-roomSize.width / 2) slopeRadius)
+                                    (Vector3d.meters (len / 2 - slopeRadius) (-roomSize.width / 2) slopeRadius)
                                 |> Body.translateBy
                                     (Vector3d.meters
                                         (sin (degrees angle) * slopeRadius)
@@ -1655,7 +1659,7 @@ walls =
                                 -- move to center of quarter-pipe
                                 |> Body.rotateAround Axis3d.z (Angle.degrees 90)
                                 |> Body.translateBy
-                                    (Vector3d.meters (-roomSize.length / 2 + slopeRadius) (-roomSize.width / 2) slopeRadius)
+                                    (Vector3d.meters (-len / 2 + slopeRadius) (-roomSize.width / 2) slopeRadius)
                                 |> Body.translateBy
                                     (Vector3d.meters
                                         (sin (degrees angle) * slopeRadius * -1)
