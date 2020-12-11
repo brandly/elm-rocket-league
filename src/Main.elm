@@ -172,7 +172,7 @@ carSettings =
     , minSuspensionLength = Length.meters 0
     , maxSuspensionLength = Length.meters 0.6
     , radius = Length.meters 0.5
-    , suspensionStiffness = 30
+    , suspensionStiffness = 160
     , dampingCompression = 4.4
     , dampingRelaxation = 2.3
     , frictionSlip = 5
@@ -1376,7 +1376,7 @@ base =
     -- TODO: better car shape
     let
         offset =
-            Point3d.meters -35 0 3
+            Point3d.meters -35 0 1.1
 
         size =
             ( Length.meters 2.8, Length.meters 2, Length.meters 0.5 )
