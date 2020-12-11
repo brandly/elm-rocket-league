@@ -4250,7 +4250,7 @@ function _Browser_getViewport()
 		gD: {
 			b1: _Browser_window.pageXOffset,
 			b2: _Browser_window.pageYOffset,
-			F: _Browser_doc.documentElement.clientWidth,
+			m: _Browser_doc.documentElement.clientWidth,
 			aP: _Browser_doc.documentElement.clientHeight
 		}
 	};
@@ -4261,7 +4261,7 @@ function _Browser_getScene()
 	var body = _Browser_doc.body;
 	var elem = _Browser_doc.documentElement;
 	return {
-		F: Math.max(body.scrollWidth, body.offsetWidth, elem.scrollWidth, elem.offsetWidth, elem.clientWidth),
+		m: Math.max(body.scrollWidth, body.offsetWidth, elem.scrollWidth, elem.offsetWidth, elem.clientWidth),
 		aP: Math.max(body.scrollHeight, body.offsetHeight, elem.scrollHeight, elem.offsetHeight, elem.clientHeight)
 	};
 }
@@ -4286,13 +4286,13 @@ function _Browser_getViewportOf(id)
 	{
 		return {
 			e1: {
-				F: node.scrollWidth,
+				m: node.scrollWidth,
 				aP: node.scrollHeight
 			},
 			gD: {
 				b1: node.scrollLeft,
 				b2: node.scrollTop,
-				F: node.clientWidth,
+				m: node.clientWidth,
 				aP: node.clientHeight
 			}
 		};
@@ -4327,13 +4327,13 @@ function _Browser_getElement(id)
 			gD: {
 				b1: x,
 				b2: y,
-				F: _Browser_doc.documentElement.clientWidth,
+				m: _Browser_doc.documentElement.clientWidth,
 				aP: _Browser_doc.documentElement.clientHeight
 			},
 			fI: {
 				b1: x + rect.left,
 				b2: y + rect.top,
-				F: rect.width,
+				m: rect.width,
 				aP: rect.height
 			}
 		};
@@ -6727,25 +6727,25 @@ var $elm$core$Array$treeFromBuilder = F2(
 	});
 var $elm$core$Array$builderToArray = F2(
 	function (reverseNodeList, builder) {
-		if (!builder.m) {
+		if (!builder.n) {
 			return A4(
 				$elm$core$Array$Array_elm_builtin,
-				$elm$core$Elm$JsArray$length(builder.p),
+				$elm$core$Elm$JsArray$length(builder.q),
 				$elm$core$Array$shiftStep,
 				$elm$core$Elm$JsArray$empty,
-				builder.p);
+				builder.q);
 		} else {
-			var treeLen = builder.m * $elm$core$Array$branchFactor;
+			var treeLen = builder.n * $elm$core$Array$branchFactor;
 			var depth = $elm$core$Basics$floor(
 				A2($elm$core$Basics$logBase, $elm$core$Array$branchFactor, treeLen - 1));
-			var correctNodeList = reverseNodeList ? $elm$core$List$reverse(builder.A) : builder.A;
-			var tree = A2($elm$core$Array$treeFromBuilder, correctNodeList, builder.m);
+			var correctNodeList = reverseNodeList ? $elm$core$List$reverse(builder.C) : builder.C;
+			var tree = A2($elm$core$Array$treeFromBuilder, correctNodeList, builder.n);
 			return A4(
 				$elm$core$Array$Array_elm_builtin,
-				$elm$core$Elm$JsArray$length(builder.p) + treeLen,
+				$elm$core$Elm$JsArray$length(builder.q) + treeLen,
 				A2($elm$core$Basics$max, 5, depth * $elm$core$Array$shiftStep),
 				tree,
-				builder.p);
+				builder.q);
 		}
 	});
 var $elm$core$Basics$idiv = _Basics_idiv;
@@ -6758,7 +6758,7 @@ var $elm$core$Array$initializeHelp = F5(
 				return A2(
 					$elm$core$Array$builderToArray,
 					false,
-					{A: nodeList, m: (len / $elm$core$Array$branchFactor) | 0, p: tail});
+					{C: nodeList, n: (len / $elm$core$Array$branchFactor) | 0, q: tail});
 			} else {
 				var leaf = $elm$core$Array$Leaf(
 					A3($elm$core$Elm$JsArray$initialize, $elm$core$Array$branchFactor, fromIndex, fn));
@@ -7185,7 +7185,7 @@ var $ianmackenzie$elm_3d_scene$Scene3d$Material$trilinearFiltering = {cg: true, 
 var $author$project$Main$init = function (_v0) {
 	return _Utils_Tuple2(
 		{
-			cG: {aP: 0, F: 0},
+			cG: {aP: 0, m: 0},
 			aX: $author$project$Main$Loading
 		},
 		$elm$core$Platform$Cmd$batch(
@@ -7199,7 +7199,7 @@ var $author$project$Main$init = function (_v0) {
 					$elm$core$Task$perform,
 					function (_v1) {
 						var viewport = _v1.gD;
-						return A2($author$project$Main$Resize, viewport.F, viewport.aP);
+						return A2($author$project$Main$Resize, viewport.m, viewport.aP);
 					},
 					$elm$browser$Browser$Dom$getViewport)
 				])));
@@ -7969,7 +7969,7 @@ var $author$project$Main$carSettings = {
 	cE: $ianmackenzie$elm_geometry$Direction3d$y,
 	dG: 0.01,
 	bi: $ianmackenzie$elm_units$Length$meters(0.3),
-	dM: 30
+	dM: 160
 };
 var $elm$core$Basics$composeR = F3(
 	function (f, g, x) {
@@ -9655,10 +9655,10 @@ var $author$project$Main$floor = function (texture) {
 			return A3($ianmackenzie$elm_geometry$Point3d$meters, x, y, 0);
 		});
 	var fullSize = {
-		J: $ianmackenzie$elm_units$Length$inMeters($author$project$Main$floorSize),
-		F: $ianmackenzie$elm_units$Length$inMeters($author$project$Main$floorSize) / 2
+		B: $ianmackenzie$elm_units$Length$inMeters($author$project$Main$floorSize),
+		m: $ianmackenzie$elm_units$Length$inMeters($author$project$Main$floorSize) / 2
 	};
-	var tileSize = {J: fullSize.J / tileCount, F: fullSize.F / tileCount};
+	var tileSize = {B: fullSize.B / tileCount, m: fullSize.m / tileCount};
 	var coords = A2(
 		$elm$core$List$concatMap,
 		function (x) {
@@ -10964,7 +10964,7 @@ var $elm$core$Array$fromListHelp = F3(
 				return A2(
 					$elm$core$Array$builderToArray,
 					true,
-					{A: nodeList, m: nodeListSize, p: jsArray});
+					{C: nodeList, n: nodeListSize, q: jsArray});
 			} else {
 				var $temp$list = remainingItems,
 					$temp$nodeList = A2(
@@ -11029,8 +11029,8 @@ var $ianmackenzie$elm_triangular_mesh$TriangularMesh$indexed = F2(
 			var k = _v0.c;
 			return ((i >= 0) && (_Utils_cmp(i, numVertices) < 0)) && (((j >= 0) && (_Utils_cmp(j, numVertices) < 0)) && ((k >= 0) && (_Utils_cmp(k, numVertices) < 0)));
 		};
-		return A2($elm$core$List$all, validIndices, faceIndices_) ? {G: faceIndices_, b0: vertices_} : {
-			G: A2($elm$core$List$filter, validIndices, faceIndices_),
+		return A2($elm$core$List$all, validIndices, faceIndices_) ? {H: faceIndices_, b0: vertices_} : {
+			H: A2($elm$core$List$filter, validIndices, faceIndices_),
 			b0: vertices_
 		};
 	});
@@ -11116,7 +11116,7 @@ var $ianmackenzie$elm_3d_scene$Scene3d$Mesh$collectSmoothTextured = F2(
 	});
 var $ianmackenzie$elm_triangular_mesh$TriangularMesh$faceIndices = function (_v0) {
 	var mesh = _v0;
-	return mesh.G;
+	return mesh.H;
 };
 var $ianmackenzie$elm_units$Quantity$lessThanOrEqualTo = F2(
 	function (_v0, _v1) {
@@ -11421,18 +11421,18 @@ var $ianmackenzie$elm_3d_scene$Scene3d$Transformation$compose = F2(
 	function (t1, t2) {
 		return {
 			el: _Utils_eq(t1.el, t2.el),
-			r: ((t1.r * t2.r) + (t1.s * t2.u)) + (t1.t * t2.x),
-			s: ((t1.r * t2.s) + (t1.s * t2.v)) + (t1.t * t2.y),
-			t: ((t1.r * t2.t) + (t1.s * t2.w)) + (t1.t * t2.z),
-			u: ((t1.u * t2.r) + (t1.v * t2.u)) + (t1.w * t2.x),
-			v: ((t1.u * t2.s) + (t1.v * t2.v)) + (t1.w * t2.y),
-			w: ((t1.u * t2.t) + (t1.v * t2.w)) + (t1.w * t2.z),
-			x: ((t1.x * t2.r) + (t1.y * t2.u)) + (t1.z * t2.x),
-			y: ((t1.x * t2.s) + (t1.y * t2.v)) + (t1.z * t2.y),
-			z: ((t1.x * t2.t) + (t1.y * t2.w)) + (t1.z * t2.z),
-			M: t2.M + ((((t1.M * t2.r) + (t1.N * t2.u)) + (t1.O * t2.x)) * t2.cF),
-			N: t2.N + ((((t1.M * t2.s) + (t1.N * t2.v)) + (t1.O * t2.y)) * t2.cF),
-			O: t2.O + ((((t1.M * t2.t) + (t1.N * t2.w)) + (t1.O * t2.z)) * t2.cF),
+			s: ((t1.s * t2.s) + (t1.t * t2.v)) + (t1.u * t2.y),
+			t: ((t1.s * t2.t) + (t1.t * t2.w)) + (t1.u * t2.z),
+			u: ((t1.s * t2.u) + (t1.t * t2.x)) + (t1.u * t2.A),
+			v: ((t1.v * t2.s) + (t1.w * t2.v)) + (t1.x * t2.y),
+			w: ((t1.v * t2.t) + (t1.w * t2.w)) + (t1.x * t2.z),
+			x: ((t1.v * t2.u) + (t1.w * t2.x)) + (t1.x * t2.A),
+			y: ((t1.y * t2.s) + (t1.z * t2.v)) + (t1.A * t2.y),
+			z: ((t1.y * t2.t) + (t1.z * t2.w)) + (t1.A * t2.z),
+			A: ((t1.y * t2.u) + (t1.z * t2.x)) + (t1.A * t2.A),
+			M: t2.M + ((((t1.M * t2.s) + (t1.N * t2.v)) + (t1.O * t2.y)) * t2.cF),
+			N: t2.N + ((((t1.M * t2.t) + (t1.N * t2.w)) + (t1.O * t2.z)) * t2.cF),
+			O: t2.O + ((((t1.M * t2.u) + (t1.N * t2.x)) + (t1.O * t2.A)) * t2.cF),
 			cF: t1.cF * t2.cF
 		};
 	});
@@ -11459,7 +11459,7 @@ var $ianmackenzie$elm_3d_scene$Scene3d$Entity$transformBy = F2(
 	});
 var $ianmackenzie$elm_3d_scene$Scene3d$Transformation$translateBy = function (displacement) {
 	var v = $ianmackenzie$elm_geometry$Vector3d$unwrap(displacement);
-	return {el: true, r: 1, s: 0, t: 0, u: 0, v: 1, w: 0, x: 0, y: 0, z: 1, M: v.b1, N: v.b2, O: v.b3, cF: 1};
+	return {el: true, s: 1, t: 0, u: 0, v: 0, w: 1, x: 0, y: 0, z: 0, A: 1, M: v.b1, N: v.b2, O: v.b3, cF: 1};
 };
 var $ianmackenzie$elm_3d_scene$Scene3d$Entity$translateBy = F2(
 	function (displacement, givenDrawable) {
@@ -12391,7 +12391,7 @@ var $ianmackenzie$elm_3d_scene$Scene3d$Mesh$shadowImpl = F3(
 	});
 var $ianmackenzie$elm_triangular_mesh$TriangularMesh$triangles = function (faceVertices_) {
 	return {
-		G: A2(
+		H: A2(
 			$elm$core$List$map,
 			function (i) {
 				return _Utils_Tuple3(3 * i, (3 * i) + 1, (3 * i) + 2);
@@ -12500,15 +12500,15 @@ var $ianmackenzie$elm_3d_scene$Scene3d$Transformation$placeIn = function (frame)
 		$ianmackenzie$elm_geometry$Frame3d$xDirection(frame));
 	return {
 		el: $ianmackenzie$elm_geometry$Frame3d$isRightHanded(frame),
-		r: i.b1,
-		s: i.b2,
-		t: i.b3,
-		u: j.b1,
-		v: j.b2,
-		w: j.b3,
-		x: k.b1,
-		y: k.b2,
-		z: k.b3,
+		s: i.b1,
+		t: i.b2,
+		u: i.b3,
+		v: j.b1,
+		w: j.b2,
+		x: j.b3,
+		y: k.b1,
+		z: k.b2,
+		A: k.b3,
 		M: p0.b1,
 		N: p0.b2,
 		O: p0.b3,
@@ -12673,7 +12673,7 @@ var $author$project$Main$base = function () {
 		$ianmackenzie$elm_units$Length$meters(2),
 		$ianmackenzie$elm_units$Length$meters(0.5));
 	var shape = A2($ianmackenzie$elm_geometry$Block3d$centeredOn, $ianmackenzie$elm_geometry$Frame3d$atOrigin, size);
-	var offset = A3($ianmackenzie$elm_geometry$Point3d$meters, -35, 0, 3);
+	var offset = A3($ianmackenzie$elm_geometry$Point3d$meters, -35, 0, 1.1);
 	var material = $ianmackenzie$elm_3d_scene$Scene3d$Material$nonmetal(
 		{
 			dW: A3($avh4$elm_color$Color$rgb255, 0, 180, 180),
@@ -13885,9 +13885,9 @@ var $author$project$Internal$Equation$computeContactB = F5(
 		var pj = _v0.gn;
 		var ni = _v0.gf;
 		var spookA = _v1.K;
-		var spookB = _v1.E;
-		var wA = _v1.C;
-		var wB = _v1.D;
+		var spookB = _v1.G;
+		var wA = _v1.E;
+		var wB = _v1.F;
 		var gW = (((bounciness + 1) * (A2($author$project$Internal$Vector3$dot, bj.cM, ni) - A2($author$project$Internal$Vector3$dot, bi.cM, ni))) + A2($author$project$Internal$Vector3$dot, bj.b8, wB)) + A2($author$project$Internal$Vector3$dot, bi.b8, wA);
 		var g = (((pj.b1 - pi.b1) * ni.b1) + ((pj.b2 - pi.b2) * ni.b2)) + ((pj.b3 - pi.b3) * ni.b3);
 		return ((-g) * spookA) - (gW * spookB);
@@ -13896,16 +13896,16 @@ var $author$project$Internal$Equation$defaultRelaxation = 3;
 var $author$project$Internal$Equation$defaultStiffness = 10000000;
 var $author$project$Internal$Equation$computeC = F3(
 	function (bi, bj, _v0) {
-		var wA = _v0.C;
-		var wB = _v0.D;
+		var wA = _v0.E;
+		var wB = _v0.F;
 		var spookEps = _v0.Q;
 		return (((((((bi.co + bj.co) + (wA.b1 * (((bi.cn.f2 * wA.b1) + (bi.cn.f3 * wA.b2)) + (bi.cn.f4 * wA.b3)))) + (wA.b2 * (((bi.cn.f5 * wA.b1) + (bi.cn.f6 * wA.b2)) + (bi.cn.f7 * wA.b3)))) + (wA.b3 * (((bi.cn.f8 * wA.b1) + (bi.cn.f9 * wA.b2)) + (bi.cn.ga * wA.b3)))) + (wB.b1 * (((bj.cn.f2 * wB.b1) + (bj.cn.f3 * wB.b2)) + (bj.cn.f4 * wB.b3)))) + (wB.b2 * (((bj.cn.f5 * wB.b1) + (bj.cn.f6 * wB.b2)) + (bj.cn.f7 * wB.b3)))) + (wB.b3 * (((bj.cn.f8 * wB.b1) + (bj.cn.f9 * wB.b2)) + (bj.cn.ga * wB.b3)))) + spookEps;
 	});
 var $author$project$Internal$Equation$computeGiMf = F4(
 	function (gravity, bi, bj, _v0) {
-		var wA = _v0.C;
+		var wA = _v0.E;
 		var vB = _v0.L;
-		var wB = _v0.D;
+		var wB = _v0.F;
 		var gravityj = (bj.dc > 0) ? gravity : $author$project$Internal$Vector3$zero;
 		var gravityi = (bi.dc > 0) ? gravity : $author$project$Internal$Vector3$zero;
 		return (((((((-(((vB.b1 * ((bi.co * bi.ch.b1) + gravityi.b1)) + (vB.b2 * ((bi.co * bi.ch.b2) + gravityi.b2))) + (vB.b3 * ((bi.co * bi.ch.b3) + gravityi.b3)))) + (((vB.b1 * ((bj.co * bj.ch.b1) + gravityj.b1)) + (vB.b2 * ((bj.co * bj.ch.b2) + gravityj.b2))) + (vB.b3 * ((bj.co * bj.ch.b3) + gravityj.b3)))) + (wA.b1 * (((bi.cn.f2 * bi.cL.b1) + (bi.cn.f3 * bi.cL.b2)) + (bi.cn.f4 * bi.cL.b3)))) + (wA.b2 * (((bi.cn.f5 * bi.cL.b1) + (bi.cn.f6 * bi.cL.b2)) + (bi.cn.f7 * bi.cL.b3)))) + (wA.b3 * (((bi.cn.f8 * bi.cL.b1) + (bi.cn.f9 * bi.cL.b2)) + (bi.cn.ga * bi.cL.b3)))) + (wB.b1 * (((bj.cn.f2 * bj.cL.b1) + (bj.cn.f3 * bj.cL.b2)) + (bj.cn.f4 * bj.cL.b3)))) + (wB.b2 * (((bj.cn.f5 * bj.cL.b1) + (bj.cn.f6 * bj.cL.b2)) + (bj.cn.f7 * bj.cL.b3)))) + (wB.b3 * (((bj.cn.f8 * bj.cL.b1) + (bj.cn.f9 * bj.cL.b2)) + (bj.cn.ga * bj.cL.b3)));
@@ -13916,23 +13916,23 @@ var $author$project$Internal$Equation$initSolverParams = F5(
 			d8: {
 				T: solverEquation.T,
 				W: solverEquation.W,
-				ab: A3(computeB, bi, bj, solverEquation) - (ctx.q * A4($author$project$Internal$Equation$computeGiMf, ctx.ec, bi, bj, solverEquation)),
+				ab: A3(computeB, bi, bj, solverEquation) - (ctx.r * A4($author$project$Internal$Equation$computeGiMf, ctx.ec, bi, bj, solverEquation)),
 				ac: 1 / A3($author$project$Internal$Equation$computeC, bi, bj, solverEquation),
 				K: solverEquation.K,
-				E: solverEquation.E,
+				G: solverEquation.G,
 				Q: solverEquation.Q,
 				L: solverEquation.L,
-				C: solverEquation.C,
-				D: solverEquation.D
+				E: solverEquation.E,
+				F: solverEquation.F
 			},
 			e4: 0
 		};
 	});
 var $author$project$Internal$Equation$addDistanceConstraintEquations = F4(
 	function (ctx, body1, body2, distance) {
-		var spookEps = 4.0 / (((ctx.q * ctx.q) * $author$project$Internal$Equation$defaultStiffness) * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
+		var spookEps = 4.0 / (((ctx.r * ctx.r) * $author$project$Internal$Equation$defaultStiffness) * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
 		var spookB = (4.0 * $author$project$Internal$Equation$defaultRelaxation) / (1 + (4 * $author$project$Internal$Equation$defaultRelaxation));
-		var spookA = 4.0 / (ctx.q * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
+		var spookA = 4.0 / (ctx.r * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
 		var ni = A2(
 			$author$project$Internal$Vector3$direction,
 			$author$project$Internal$Transform3d$originPoint(body2.bY),
@@ -13966,18 +13966,18 @@ var $author$project$Internal$Equation$addDistanceConstraintEquations = F4(
 					ab: 0,
 					ac: 0,
 					K: spookA,
-					E: spookB,
+					G: spookB,
 					Q: spookEps,
 					L: ni,
-					C: A2($author$project$Internal$Vector3$cross, ni, ri),
-					D: A2($author$project$Internal$Vector3$cross, rj, ni)
+					E: A2($author$project$Internal$Vector3$cross, ni, ri),
+					F: A2($author$project$Internal$Vector3$cross, rj, ni)
 				}));
 	});
 var $author$project$Internal$Equation$computeGW = F3(
 	function (bi, bj, _v0) {
-		var wA = _v0.C;
+		var wA = _v0.E;
 		var vB = _v0.L;
-		var wB = _v0.D;
+		var wB = _v0.F;
 		return (((-(((vB.b1 * bi.cM.b1) + (vB.b2 * bi.cM.b2)) + (vB.b3 * bi.cM.b3))) + (((wA.b1 * bi.b8.b1) + (wA.b2 * bi.b8.b2)) + (wA.b3 * bi.b8.b3))) + (((vB.b1 * bj.cM.b1) + (vB.b2 * bj.cM.b2)) + (vB.b3 * bj.cM.b3))) + (((wB.b1 * bj.b8.b1) + (wB.b2 * bj.b8.b2)) + (wB.b3 * bj.b8.b3));
 	});
 var $author$project$Internal$Equation$computeRotationalB = F4(
@@ -13986,7 +13986,7 @@ var $author$project$Internal$Equation$computeRotationalB = F4(
 		var nj = _v0.aT;
 		var maxAngleCos = _v0.aS;
 		var spookA = solverEquation.K;
-		var spookB = solverEquation.E;
+		var spookB = solverEquation.G;
 		var gW = A3($author$project$Internal$Equation$computeGW, bi, bj, solverEquation);
 		var g = maxAngleCos - A2($author$project$Internal$Vector3$dot, ni, nj);
 		return ((-g) * spookA) - (gW * spookB);
@@ -14006,9 +14006,9 @@ var $author$project$Internal$Equation$addHingeRotationalConstraintEquations = F6
 	function (ctx, body1, body2, axis1, axis2, equations) {
 		var worldAxis2 = A2($author$project$Internal$Transform3d$directionPlaceIn, body2.bY, axis2);
 		var worldAxis1 = A2($author$project$Internal$Transform3d$directionPlaceIn, body1.bY, axis1);
-		var spookEps = 4.0 / (((ctx.q * ctx.q) * $author$project$Internal$Equation$defaultStiffness) * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
+		var spookEps = 4.0 / (((ctx.r * ctx.r) * $author$project$Internal$Equation$defaultStiffness) * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
 		var spookB = (4.0 * $author$project$Internal$Equation$defaultRelaxation) / (1 + (4 * $author$project$Internal$Equation$defaultRelaxation));
-		var spookA = 4.0 / (ctx.q * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
+		var spookA = 4.0 / (ctx.r * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
 		var nj2 = worldAxis2;
 		var nj1 = worldAxis2;
 		var _v0 = $author$project$Internal$Vector3$tangents(worldAxis1);
@@ -14029,11 +14029,11 @@ var $author$project$Internal$Equation$addHingeRotationalConstraintEquations = F6
 					ab: 0,
 					ac: 0,
 					K: spookA,
-					E: spookB,
+					G: spookB,
 					Q: spookEps,
 					L: $author$project$Internal$Vector3$zero,
-					C: A2($author$project$Internal$Vector3$cross, nj1, ni1),
-					D: A2($author$project$Internal$Vector3$cross, ni1, nj1)
+					E: A2($author$project$Internal$Vector3$cross, nj1, ni1),
+					F: A2($author$project$Internal$Vector3$cross, ni1, nj1)
 				}),
 			A2(
 				$elm$core$List$cons,
@@ -14050,11 +14050,11 @@ var $author$project$Internal$Equation$addHingeRotationalConstraintEquations = F6
 						ab: 0,
 						ac: 0,
 						K: spookA,
-						E: spookB,
+						G: spookB,
 						Q: spookEps,
 						L: $author$project$Internal$Vector3$zero,
-						C: A2($author$project$Internal$Vector3$cross, nj2, ni2),
-						D: A2($author$project$Internal$Vector3$cross, ni2, nj2)
+						E: A2($author$project$Internal$Vector3$cross, nj2, ni2),
+						F: A2($author$project$Internal$Vector3$cross, ni2, nj2)
 					}),
 				equations));
 	});
@@ -14068,9 +14068,9 @@ var $author$project$Internal$Equation$addLockRotationalConstraintEquations = fun
 							return function (z1) {
 								return function (z2) {
 									return function (equations) {
-										var spookEps = 4.0 / (((ctx.q * ctx.q) * $author$project$Internal$Equation$defaultStiffness) * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
+										var spookEps = 4.0 / (((ctx.r * ctx.r) * $author$project$Internal$Equation$defaultStiffness) * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
 										var spookB = (4.0 * $author$project$Internal$Equation$defaultRelaxation) / (1 + (4 * $author$project$Internal$Equation$defaultRelaxation));
-										var spookA = 4.0 / (ctx.q * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
+										var spookA = 4.0 / (ctx.r * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
 										var nj3 = A2($author$project$Internal$Transform3d$directionPlaceIn, body2.bY, x2);
 										var nj2 = A2($author$project$Internal$Transform3d$directionPlaceIn, body2.bY, z2);
 										var nj1 = A2($author$project$Internal$Transform3d$directionPlaceIn, body2.bY, y2);
@@ -14092,11 +14092,11 @@ var $author$project$Internal$Equation$addLockRotationalConstraintEquations = fun
 													ab: 0,
 													ac: 0,
 													K: spookA,
-													E: spookB,
+													G: spookB,
 													Q: spookEps,
 													L: $author$project$Internal$Vector3$zero,
-													C: A2($author$project$Internal$Vector3$cross, nj1, ni1),
-													D: A2($author$project$Internal$Vector3$cross, ni1, nj1)
+													E: A2($author$project$Internal$Vector3$cross, nj1, ni1),
+													F: A2($author$project$Internal$Vector3$cross, ni1, nj1)
 												}),
 											A2(
 												$elm$core$List$cons,
@@ -14113,11 +14113,11 @@ var $author$project$Internal$Equation$addLockRotationalConstraintEquations = fun
 														ab: 0,
 														ac: 0,
 														K: spookA,
-														E: spookB,
+														G: spookB,
 														Q: spookEps,
 														L: $author$project$Internal$Vector3$zero,
-														C: A2($author$project$Internal$Vector3$cross, nj2, ni2),
-														D: A2($author$project$Internal$Vector3$cross, ni2, nj2)
+														E: A2($author$project$Internal$Vector3$cross, nj2, ni2),
+														F: A2($author$project$Internal$Vector3$cross, ni2, nj2)
 													}),
 												A2(
 													$elm$core$List$cons,
@@ -14134,11 +14134,11 @@ var $author$project$Internal$Equation$addLockRotationalConstraintEquations = fun
 															ab: 0,
 															ac: 0,
 															K: spookA,
-															E: spookB,
+															G: spookB,
 															Q: spookEps,
 															L: $author$project$Internal$Vector3$zero,
-															C: A2($author$project$Internal$Vector3$cross, nj3, ni3),
-															D: A2($author$project$Internal$Vector3$cross, ni3, nj3)
+															E: A2($author$project$Internal$Vector3$cross, nj3, ni3),
+															F: A2($author$project$Internal$Vector3$cross, ni3, nj3)
 														}),
 													equations)));
 									};
@@ -14153,9 +14153,9 @@ var $author$project$Internal$Equation$addLockRotationalConstraintEquations = fun
 };
 var $author$project$Internal$Equation$addPointToPointConstraintEquations = F6(
 	function (ctx, body1, body2, pivot1, pivot2, equations) {
-		var spookEps = 4.0 / (((ctx.q * ctx.q) * $author$project$Internal$Equation$defaultStiffness) * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
+		var spookEps = 4.0 / (((ctx.r * ctx.r) * $author$project$Internal$Equation$defaultStiffness) * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
 		var spookB = (4.0 * $author$project$Internal$Equation$defaultRelaxation) / (1 + (4 * $author$project$Internal$Equation$defaultRelaxation));
-		var spookA = 4.0 / (ctx.q * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
+		var spookA = 4.0 / (ctx.r * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
 		var rj = A2($author$project$Internal$Transform3d$directionPlaceIn, body2.bY, pivot2);
 		var ri = A2($author$project$Internal$Transform3d$directionPlaceIn, body1.bY, pivot1);
 		return A3(
@@ -14187,11 +14187,11 @@ var $author$project$Internal$Equation$addPointToPointConstraintEquations = F6(
 							ab: 0,
 							ac: 0,
 							K: spookA,
-							E: spookB,
+							G: spookB,
 							Q: spookEps,
 							L: ni,
-							C: A2($author$project$Internal$Vector3$cross, ni, ri),
-							D: A2($author$project$Internal$Vector3$cross, rj, ni)
+							E: A2($author$project$Internal$Vector3$cross, ni, ri),
+							F: A2($author$project$Internal$Vector3$cross, rj, ni)
 						}));
 			},
 			equations,
@@ -14245,15 +14245,15 @@ var $author$project$Internal$Equation$constraintEquationsGroup = F4(
 	});
 var $author$project$Internal$Equation$computeFrictionB = F3(
 	function (bi, bj, solverEquation) {
-		var spookB = solverEquation.E;
+		var spookB = solverEquation.G;
 		var gW = A3($author$project$Internal$Equation$computeGW, bi, bj, solverEquation);
 		return (-gW) * spookB;
 	});
 var $author$project$Internal$Equation$addContactEquations = F7(
 	function (ctx, maxFrictionForce, bounciness, body1, body2, contact, equations) {
-		var spookEps = 4.0 / (((ctx.q * ctx.q) * $author$project$Internal$Equation$defaultStiffness) * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
+		var spookEps = 4.0 / (((ctx.r * ctx.r) * $author$project$Internal$Equation$defaultStiffness) * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
 		var spookB = (4.0 * $author$project$Internal$Equation$defaultRelaxation) / (1 + (4 * $author$project$Internal$Equation$defaultRelaxation));
-		var spookA = 4.0 / (ctx.q * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
+		var spookA = 4.0 / (ctx.r * (1 + (4 * $author$project$Internal$Equation$defaultRelaxation)));
 		var rj = A2(
 			$author$project$Internal$Vector3$sub,
 			contact.gn,
@@ -14279,11 +14279,11 @@ var $author$project$Internal$Equation$addContactEquations = F7(
 					ab: 0,
 					ac: 0,
 					K: spookA,
-					E: spookB,
+					G: spookB,
 					Q: spookEps,
 					L: contact.gf,
-					C: A2($author$project$Internal$Vector3$cross, contact.gf, ri),
-					D: A2($author$project$Internal$Vector3$cross, rj, contact.gf)
+					E: A2($author$project$Internal$Vector3$cross, contact.gf, ri),
+					F: A2($author$project$Internal$Vector3$cross, rj, contact.gf)
 				}),
 			A2(
 				$elm$core$List$cons,
@@ -14299,11 +14299,11 @@ var $author$project$Internal$Equation$addContactEquations = F7(
 						ab: 0,
 						ac: 0,
 						K: spookA,
-						E: spookB,
+						G: spookB,
 						Q: spookEps,
 						L: t1,
-						C: A2($author$project$Internal$Vector3$cross, t1, ri),
-						D: A2($author$project$Internal$Vector3$cross, rj, t1)
+						E: A2($author$project$Internal$Vector3$cross, t1, ri),
+						F: A2($author$project$Internal$Vector3$cross, rj, t1)
 					}),
 				A2(
 					$elm$core$List$cons,
@@ -14319,11 +14319,11 @@ var $author$project$Internal$Equation$addContactEquations = F7(
 							ab: 0,
 							ac: 0,
 							K: spookA,
-							E: spookB,
+							G: spookB,
 							Q: spookEps,
 							L: t2,
-							C: A2($author$project$Internal$Vector3$cross, t2, ri),
-							D: A2($author$project$Internal$Vector3$cross, rj, t2)
+							E: A2($author$project$Internal$Vector3$cross, t2, ri),
+							F: A2($author$project$Internal$Vector3$cross, rj, t2)
 						}),
 					equations)));
 	});
@@ -14452,9 +14452,9 @@ var $author$project$Internal$Solver$solveEquationsGroup = F5(
 				var invI2 = body2.k.cn;
 				var invI1 = body1.k.cn;
 				var _v1 = equation;
-				var wA = _v1.C;
+				var wA = _v1.E;
 				var vB = _v1.L;
-				var wB = _v1.D;
+				var wB = _v1.F;
 				var minForce = _v1.W;
 				var maxForce = _v1.T;
 				var solverB = _v1.ab;
@@ -14633,7 +14633,7 @@ var $author$project$Internal$Transform3d$translateBy = F2(
 	});
 var $author$project$Internal$SolverBody$toBody = F2(
 	function (_v0, _v1) {
-		var dt = _v0.q;
+		var dt = _v0.r;
 		var gravity = _v0.ec;
 		var body = _v1.k;
 		var vX = _v1.bm;
@@ -14701,7 +14701,7 @@ var $author$project$Internal$Solver$updateBodies = F3(
 var $author$project$Internal$Solver$solve = F2(
 	function (dt, world) {
 		var ctx = {
-			q: dt,
+			r: dt,
 			ec: world.ec,
 			ed: $author$project$Internal$Vector3$length(world.ec)
 		};
@@ -15823,7 +15823,7 @@ var $ianmackenzie$elm_geometry$Vector3d$meters = F3(
 	function (x, y, z) {
 		return {b1: x, b2: y, b3: z};
 	});
-var $author$project$Main$roomSize = {aP: 60, J: 150, F: 144};
+var $author$project$Main$roomSize = {aP: 60, B: 150, m: 144};
 var $ianmackenzie$elm_units$Angle$inRadians = function (_v0) {
 	var numRadians = _v0;
 	return numRadians;
@@ -15952,6 +15952,11 @@ var $ianmackenzie$elm_geometry$Frame3d$xAxis = function (_v0) {
 	return A2($ianmackenzie$elm_geometry$Axis3d$through, frame.gl, frame.gJ);
 };
 var $ianmackenzie$elm_geometry$Axis3d$y = A2($ianmackenzie$elm_geometry$Axis3d$through, $ianmackenzie$elm_geometry$Point3d$origin, $ianmackenzie$elm_geometry$Direction3d$y);
+var $ianmackenzie$elm_geometry$Frame3d$yAxis = function (_v0) {
+	var frame = _v0;
+	return A2($ianmackenzie$elm_geometry$Axis3d$through, frame.gl, frame.gN);
+};
+var $ianmackenzie$elm_geometry$Axis3d$z = A2($ianmackenzie$elm_geometry$Axis3d$through, $ianmackenzie$elm_geometry$Point3d$origin, $ianmackenzie$elm_geometry$Direction3d$z);
 var $author$project$Main$walls = function () {
 	var buildPlane = F2(
 		function (height, length) {
@@ -15968,8 +15973,8 @@ var $author$project$Main$walls = function () {
 				});
 		});
 	var buildWall = buildPlane($author$project$Main$roomSize.aP);
-	var frontBackWall = buildWall($author$project$Main$roomSize.F);
-	var sideWall = buildWall($author$project$Main$roomSize.J);
+	var frontBackWall = buildWall($author$project$Main$roomSize.m);
+	var sideWall = buildWall($author$project$Main$roomSize.B);
 	var _v0 = _Utils_Tuple2(10, 30);
 	var slopeRadius = _v0.a;
 	var stepCount = _v0.b;
@@ -15981,7 +15986,7 @@ var $author$project$Main$walls = function () {
 				[
 					A2(
 					$author$project$Physics$Body$translateBy,
-					A3($ianmackenzie$elm_geometry$Vector3d$meters, -($author$project$Main$roomSize.J / 2), $author$project$Main$roomSize.F / 2, 0),
+					A3($ianmackenzie$elm_geometry$Vector3d$meters, -($author$project$Main$roomSize.B / 2), $author$project$Main$roomSize.m / 2, 0),
 					A3(
 						$author$project$Physics$Body$rotateAround,
 						$ianmackenzie$elm_geometry$Axis3d$x,
@@ -15989,7 +15994,7 @@ var $author$project$Main$walls = function () {
 						sideWall)),
 					A2(
 					$author$project$Physics$Body$translateBy,
-					A3($ianmackenzie$elm_geometry$Vector3d$meters, -($author$project$Main$roomSize.J / 2), -($author$project$Main$roomSize.F / 2), 60),
+					A3($ianmackenzie$elm_geometry$Vector3d$meters, -($author$project$Main$roomSize.B / 2), -($author$project$Main$roomSize.m / 2), 60),
 					A3(
 						$author$project$Physics$Body$rotateAround,
 						$ianmackenzie$elm_geometry$Axis3d$x,
@@ -15997,7 +16002,7 @@ var $author$project$Main$walls = function () {
 						sideWall)),
 					A2(
 					$author$project$Physics$Body$translateBy,
-					A3($ianmackenzie$elm_geometry$Vector3d$meters, -($author$project$Main$roomSize.J / 2), -($author$project$Main$roomSize.F / 2), 0),
+					A3($ianmackenzie$elm_geometry$Vector3d$meters, -($author$project$Main$roomSize.B / 2), -($author$project$Main$roomSize.m / 2), 0),
 					A3(
 						$author$project$Physics$Body$rotateAround,
 						$ianmackenzie$elm_geometry$Axis3d$y,
@@ -16009,7 +16014,7 @@ var $author$project$Main$walls = function () {
 							frontBackWall))),
 					A2(
 					$author$project$Physics$Body$translateBy,
-					A3($ianmackenzie$elm_geometry$Vector3d$meters, $author$project$Main$roomSize.J / 2, $author$project$Main$roomSize.F / 2, 0),
+					A3($ianmackenzie$elm_geometry$Vector3d$meters, $author$project$Main$roomSize.B / 2, $author$project$Main$roomSize.m / 2, 0),
 					A3(
 						$author$project$Physics$Body$rotateAround,
 						$ianmackenzie$elm_geometry$Axis3d$y,
@@ -16044,43 +16049,113 @@ var $author$project$Main$walls = function () {
 										$elm$core$Basics$degrees(angle)) * slopeRadius) * (-1)),
 								A2(
 									$author$project$Physics$Body$translateBy,
-									A3($ianmackenzie$elm_geometry$Vector3d$meters, (-$author$project$Main$roomSize.J) / 2, ($author$project$Main$roomSize.F / 2) - slopeRadius, slopeRadius),
-									A2(buildPlane, 2, $author$project$Main$roomSize.J))));
+									A3($ianmackenzie$elm_geometry$Vector3d$meters, (-$author$project$Main$roomSize.B) / 2, ($author$project$Main$roomSize.m / 2) - slopeRadius, slopeRadius),
+									A2(buildPlane, 2, $author$project$Main$roomSize.B))));
 					},
 					A2(
 						$elm$core$List$map,
 						$elm$core$Basics$toFloat,
 						A2($elm$core$List$range, 1, stepCount - 1))),
-				A2(
-					$elm$core$List$map,
-					function (step) {
-						var angle = (90 / stepCount) * step;
-						return function (body) {
-							return A3(
-								$author$project$Physics$Body$rotateAround,
-								$ianmackenzie$elm_geometry$Frame3d$xAxis(
-									$author$project$Physics$Body$frame(body)),
-								$ianmackenzie$elm_units$Angle$degrees(-angle),
-								body);
-						}(
-							A2(
-								$author$project$Physics$Body$translateBy,
-								A3(
-									$ianmackenzie$elm_geometry$Vector3d$meters,
-									0,
-									($elm$core$Basics$sin(
-										$elm$core$Basics$degrees(angle)) * slopeRadius) * (-1),
-									($elm$core$Basics$cos(
-										$elm$core$Basics$degrees(angle)) * slopeRadius) * (-1)),
-								A2(
-									$author$project$Physics$Body$translateBy,
-									A3($ianmackenzie$elm_geometry$Vector3d$meters, (-$author$project$Main$roomSize.J) / 2, ((-$author$project$Main$roomSize.F) / 2) + slopeRadius, slopeRadius),
-									A2(buildPlane, 2, $author$project$Main$roomSize.J))));
-					},
+				_Utils_ap(
 					A2(
 						$elm$core$List$map,
-						$elm$core$Basics$toFloat,
-						A2($elm$core$List$range, 1, stepCount - 1))))));
+						function (step) {
+							var angle = (90 / stepCount) * step;
+							return function (body) {
+								return A3(
+									$author$project$Physics$Body$rotateAround,
+									$ianmackenzie$elm_geometry$Frame3d$xAxis(
+										$author$project$Physics$Body$frame(body)),
+									$ianmackenzie$elm_units$Angle$degrees(-angle),
+									body);
+							}(
+								A2(
+									$author$project$Physics$Body$translateBy,
+									A3(
+										$ianmackenzie$elm_geometry$Vector3d$meters,
+										0,
+										($elm$core$Basics$sin(
+											$elm$core$Basics$degrees(angle)) * slopeRadius) * (-1),
+										($elm$core$Basics$cos(
+											$elm$core$Basics$degrees(angle)) * slopeRadius) * (-1)),
+									A2(
+										$author$project$Physics$Body$translateBy,
+										A3($ianmackenzie$elm_geometry$Vector3d$meters, (-$author$project$Main$roomSize.B) / 2, ((-$author$project$Main$roomSize.m) / 2) + slopeRadius, slopeRadius),
+										A2(buildPlane, 2, $author$project$Main$roomSize.B))));
+						},
+						A2(
+							$elm$core$List$map,
+							$elm$core$Basics$toFloat,
+							A2($elm$core$List$range, 1, stepCount - 1))),
+					_Utils_ap(
+						A2(
+							$elm$core$List$map,
+							function (step) {
+								var angle = (90 / stepCount) * step;
+								return function (body) {
+									return A3(
+										$author$project$Physics$Body$rotateAround,
+										$ianmackenzie$elm_geometry$Frame3d$yAxis(
+											$author$project$Physics$Body$frame(body)),
+										$ianmackenzie$elm_units$Angle$degrees(angle),
+										body);
+								}(
+									A2(
+										$author$project$Physics$Body$translateBy,
+										A3(
+											$ianmackenzie$elm_geometry$Vector3d$meters,
+											$elm$core$Basics$sin(
+												$elm$core$Basics$degrees(angle)) * slopeRadius,
+											0,
+											($elm$core$Basics$cos(
+												$elm$core$Basics$degrees(angle)) * slopeRadius) * (-1)),
+										A2(
+											$author$project$Physics$Body$translateBy,
+											A3($ianmackenzie$elm_geometry$Vector3d$meters, ($author$project$Main$roomSize.B / 2) - slopeRadius, (-$author$project$Main$roomSize.m) / 2, slopeRadius),
+											A3(
+												$author$project$Physics$Body$rotateAround,
+												$ianmackenzie$elm_geometry$Axis3d$z,
+												$ianmackenzie$elm_units$Angle$degrees(90),
+												A2(buildPlane, 2, $author$project$Main$roomSize.m)))));
+							},
+							A2(
+								$elm$core$List$map,
+								$elm$core$Basics$toFloat,
+								A2($elm$core$List$range, 1, stepCount - 1))),
+						A2(
+							$elm$core$List$map,
+							function (step) {
+								var angle = (90 / stepCount) * step;
+								return function (body) {
+									return A3(
+										$author$project$Physics$Body$rotateAround,
+										$ianmackenzie$elm_geometry$Frame3d$yAxis(
+											$author$project$Physics$Body$frame(body)),
+										$ianmackenzie$elm_units$Angle$degrees(-angle),
+										body);
+								}(
+									A2(
+										$author$project$Physics$Body$translateBy,
+										A3(
+											$ianmackenzie$elm_geometry$Vector3d$meters,
+											($elm$core$Basics$sin(
+												$elm$core$Basics$degrees(angle)) * slopeRadius) * (-1),
+											0,
+											($elm$core$Basics$cos(
+												$elm$core$Basics$degrees(angle)) * slopeRadius) * (-1)),
+										A2(
+											$author$project$Physics$Body$translateBy,
+											A3($ianmackenzie$elm_geometry$Vector3d$meters, ((-$author$project$Main$roomSize.B) / 2) + slopeRadius, (-$author$project$Main$roomSize.m) / 2, slopeRadius),
+											A3(
+												$author$project$Physics$Body$rotateAround,
+												$ianmackenzie$elm_geometry$Axis3d$z,
+												$ianmackenzie$elm_units$Angle$degrees(90),
+												A2(buildPlane, 2, $author$project$Main$roomSize.m)))));
+							},
+							A2(
+								$elm$core$List$map,
+								$elm$core$Basics$toFloat,
+								A2($elm$core$List$range, 1, stepCount - 1))))))));
 }();
 var $author$project$Main$update = F2(
 	function (msg, model) {
@@ -16450,7 +16525,7 @@ var $author$project$Main$update = F2(
 			_Utils_update(
 				model,
 				{
-					cG: {aP: h, F: w}
+					cG: {aP: h, m: w}
 				}),
 			$elm$core$Platform$Cmd$none);
 	});
@@ -16723,7 +16798,7 @@ var $author$project$Shapes$Convex$fromCylinder = F3(
 	});
 var $ianmackenzie$elm_geometry$Cylinder3d$length = function (_v0) {
 	var cylinder = _v0;
-	return cylinder.J;
+	return cylinder.B;
 };
 var $ianmackenzie$elm_geometry$Direction3d$perpendicularTo = function (_v0) {
 	var d = _v0;
@@ -17055,7 +17130,7 @@ var $ianmackenzie$elm_geometry$Cylinder3d$centeredOn = F3(
 	function (givenCenterPoint, givenDirection, _arguments) {
 		return {
 			l: A2($ianmackenzie$elm_geometry$Axis3d$through, givenCenterPoint, givenDirection),
-			J: $ianmackenzie$elm_units$Quantity$abs(_arguments.J),
+			B: $ianmackenzie$elm_units$Quantity$abs(_arguments.B),
 			dB: $ianmackenzie$elm_units$Quantity$abs(_arguments.dB)
 		};
 	});
@@ -17064,7 +17139,7 @@ var $author$project$Main$wheelShape = A3(
 	$ianmackenzie$elm_geometry$Point3d$origin,
 	$ianmackenzie$elm_geometry$Direction3d$y,
 	{
-		J: $ianmackenzie$elm_units$Length$meters(0.3),
+		B: $ianmackenzie$elm_units$Length$meters(0.3),
 		dB: $author$project$Main$carSettings.dB
 	});
 var $author$project$Main$wheelBody = A2(
@@ -17261,7 +17336,7 @@ var $ianmackenzie$elm_3d_scene$Scene3d$ColorConversions$chromaticityToLinearRgb 
 	});
 var $ianmackenzie$elm_3d_scene$Scene3d$Transformation$modelMatrix = function (transformation) {
 	return $elm_explorations$linear_algebra$Math$Matrix4$fromRecord(
-		{f2: transformation.r, f3: transformation.u, f4: transformation.x, eu: transformation.M, f5: transformation.s, f6: transformation.v, f7: transformation.y, ev: transformation.N, f8: transformation.t, f9: transformation.w, ga: transformation.z, ew: transformation.O, ex: 0, ey: 0, ez: 0, eA: 1});
+		{f2: transformation.s, f3: transformation.v, f4: transformation.y, eu: transformation.M, f5: transformation.t, f6: transformation.w, f7: transformation.z, ev: transformation.N, f8: transformation.u, f9: transformation.x, ga: transformation.A, ew: transformation.O, ex: 0, ey: 0, ez: 0, eA: 1});
 };
 var $ianmackenzie$elm_3d_scene$Scene3d$createRenderPass = F5(
 	function (sceneProperties, viewMatrix, projectionMatrix, transformation, drawFunction) {
@@ -17534,11 +17609,11 @@ var $ianmackenzie$elm_3d_scene$Scene3d$Transformation$placementFrame = function 
 			gl: $ianmackenzie$elm_geometry$Point3d$unsafe(
 				{b1: transformation.M, b2: transformation.N, b3: transformation.O}),
 			gJ: $ianmackenzie$elm_geometry$Direction3d$unsafe(
-				{b1: transformation.r, b2: transformation.s, b3: transformation.t}),
+				{b1: transformation.s, b2: transformation.t, b3: transformation.u}),
 			gN: $ianmackenzie$elm_geometry$Direction3d$unsafe(
-				{b1: transformation.u, b2: transformation.v, b3: transformation.w}),
+				{b1: transformation.v, b2: transformation.w, b3: transformation.x}),
 			gR: $ianmackenzie$elm_geometry$Direction3d$unsafe(
-				{b1: transformation.x, b2: transformation.y, b3: transformation.z})
+				{b1: transformation.y, b2: transformation.z, b3: transformation.A})
 		});
 };
 var $ianmackenzie$elm_geometry$Direction3d$relativeTo = F2(
@@ -17761,7 +17836,7 @@ var $ianmackenzie$elm_3d_scene$Scene3d$getViewBounds = F4(
 			}
 		}
 	});
-var $ianmackenzie$elm_3d_scene$Scene3d$Transformation$identity = {el: true, r: 1, s: 0, t: 0, u: 0, v: 1, w: 0, x: 0, y: 0, z: 1, M: 0, N: 0, O: 0, cF: 1};
+var $ianmackenzie$elm_3d_scene$Scene3d$Transformation$identity = {el: true, s: 1, t: 0, u: 0, v: 0, w: 1, x: 0, y: 0, z: 0, A: 1, M: 0, N: 0, O: 0, cF: 1};
 var $ianmackenzie$elm_3d_scene$Scene3d$initStencil = $ianmackenzie$elm_3d_scene$Scene3d$updateStencil(
 	{bC: $elm_explorations$webgl$WebGL$Settings$StencilTest$replace, db: 0, dD: $ianmackenzie$elm_3d_scene$Scene3d$initialStencilCount, bT: $elm_explorations$webgl$WebGL$Settings$StencilTest$always, dT: 255, b4: $elm_explorations$webgl$WebGL$Settings$StencilTest$replace, b5: $elm_explorations$webgl$WebGL$Settings$StencilTest$replace});
 var $ianmackenzie$elm_geometry$Vector3d$length = function (_v0) {
@@ -18331,10 +18406,6 @@ var $ianmackenzie$elm_geometry$Frame3d$translateAlongOwn = F3(
 			distance,
 			frame);
 	});
-var $ianmackenzie$elm_geometry$Frame3d$yAxis = function (_v0) {
-	var frame = _v0;
-	return A2($ianmackenzie$elm_geometry$Axis3d$through, frame.gl, frame.gN);
-};
 var $ianmackenzie$elm_geometry$Frame3d$zAxis = function (_v0) {
 	var frame = _v0;
 	return A2($ianmackenzie$elm_geometry$Axis3d$through, frame.gl, frame.gR);
@@ -18481,7 +18552,7 @@ var $author$project$Main$renderRefill = F3(
 			point,
 			$ianmackenzie$elm_geometry$Direction3d$z,
 			{
-				J: $ianmackenzie$elm_units$Length$meters(0.3),
+				B: $ianmackenzie$elm_units$Length$meters(0.3),
 				dB: $ianmackenzie$elm_units$Length$meters(0.75)
 			});
 		var glowingOrange = A2(
@@ -18640,7 +18711,7 @@ var $ianmackenzie$elm_geometry$Frame3d$xyPlane = function (_v0) {
 };
 var $author$project$Main$viewGame = F2(
 	function (_v0, _v1) {
-		var width = _v0.F;
+		var width = _v0.m;
 		var height = _v0.aP;
 		var world = _v1.au;
 		var refills = _v1.bc;
