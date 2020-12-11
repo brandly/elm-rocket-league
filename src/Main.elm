@@ -1486,43 +1486,103 @@ floor texture =
     Body.plane { id = Obstacle, entity = Scene3d.group entities }
 
 
+roomSize =
+    { width = 144
+    , length = 150
+    , height = 60
+    }
+
+
 walls : List (Body Data)
 walls =
     let
-        buildWall length =
+        buildPlane height length =
             Body.plane
                 { id = Obstacle
                 , entity =
                     Scene3d.quad
                         (Material.uniform Materials.chromium)
                         (Point3d.meters 0 0 0)
-                        (Point3d.meters 0 60 0)
-                        (Point3d.meters length 60 0)
+                        (Point3d.meters 0 height 0)
+                        (Point3d.meters length height 0)
                         (Point3d.meters length 0 0)
                 }
 
+        buildWall =
+            buildPlane roomSize.height
+
         sideWall =
-            buildWall 150
+            buildWall roomSize.length
 
         frontBackWall =
-            buildWall 130
+            buildWall roomSize.width
+
+        ( slopeRadius, stepCount ) =
+            ( 10, 30 )
     in
     List.map (Body.withBehavior Body.static)
-        [ sideWall
+        ([ sideWall
             |> Body.rotateAround Axis3d.x (Angle.degrees 90)
-            |> Body.translateBy (Vector3d.meters -75 65 0)
-        , sideWall
+            |> Body.translateBy (Vector3d.meters -(roomSize.length / 2) (roomSize.width / 2) 0)
+         , sideWall
             |> Body.rotateAround Axis3d.x (Angle.degrees -90)
-            |> Body.translateBy (Vector3d.meters -75 -65 60)
-        , frontBackWall
+            |> Body.translateBy (Vector3d.meters -(roomSize.length / 2) -(roomSize.width / 2) 60)
+         , frontBackWall
             |> Body.rotateAround Axis3d.x (Angle.degrees 90)
             |> Body.rotateAround Axis3d.y (Angle.degrees 90)
-            |> Body.translateBy (Vector3d.meters -75 -65 0)
-        , frontBackWall
+            |> Body.translateBy (Vector3d.meters -(roomSize.length / 2) -(roomSize.width / 2) 0)
+         , frontBackWall
             |> Body.rotateAround Axis3d.x (Angle.degrees 90)
             |> Body.rotateAround Axis3d.y (Angle.degrees -90)
-            |> Body.translateBy (Vector3d.meters 75 65 0)
-        ]
+            |> Body.translateBy (Vector3d.meters (roomSize.length / 2) (roomSize.width / 2) 0)
+         ]
+            -- left pipe
+            ++ (List.range 1 (stepCount - 1)
+                    |> List.map toFloat
+                    |> List.map
+                        (\step ->
+                            let
+                                angle =
+                                    (90 / stepCount) * step
+                            in
+                            buildPlane 2 roomSize.length
+                                -- move to center of quarter-pipe
+                                |> Body.translateBy
+                                    (Vector3d.meters (-roomSize.length / 2) (roomSize.width / 2 - slopeRadius) slopeRadius)
+                                |> Body.translateBy
+                                    (Vector3d.meters 0
+                                        (sin (degrees angle) * slopeRadius)
+                                        (cos (degrees angle) * slopeRadius * -1)
+                                    )
+                                |> (\body ->
+                                        Body.rotateAround (Body.frame body |> Frame3d.xAxis) (Angle.degrees angle) body
+                                   )
+                        )
+               )
+            -- right pipe
+            ++ (List.range 1 (stepCount - 1)
+                    |> List.map toFloat
+                    |> List.map
+                        (\step ->
+                            let
+                                angle =
+                                    (90 / stepCount) * step
+                            in
+                            buildPlane 2 roomSize.length
+                                -- move to center of quarter-pipe
+                                |> Body.translateBy
+                                    (Vector3d.meters (-roomSize.length / 2) (-roomSize.width / 2 + slopeRadius) slopeRadius)
+                                |> Body.translateBy
+                                    (Vector3d.meters 0
+                                        (sin (degrees angle) * slopeRadius * -1)
+                                        (cos (degrees angle) * slopeRadius * -1)
+                                    )
+                                |> (\body ->
+                                        Body.rotateAround (Body.frame body |> Frame3d.xAxis) (Angle.degrees -angle) body
+                                   )
+                        )
+               )
+        )
 
 
 getTransformedDrawable : Body Data -> Scene3d.Entity WorldCoordinates
