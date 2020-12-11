@@ -1599,6 +1599,56 @@ walls =
                                    )
                         )
                )
+            -- front pipe
+            ++ (List.range 1 (stepCount - 1)
+                    |> List.map toFloat
+                    |> List.map
+                        (\step ->
+                            let
+                                angle =
+                                    (90 / stepCount) * step
+                            in
+                            buildPlane 2 roomSize.width
+                                -- move to center of quarter-pipe
+                                |> Body.rotateAround Axis3d.z (Angle.degrees 90)
+                                |> Body.translateBy
+                                    (Vector3d.meters (roomSize.length / 2 - slopeRadius) (-roomSize.width / 2) slopeRadius)
+                                |> Body.translateBy
+                                    (Vector3d.meters
+                                        (sin (degrees angle) * slopeRadius)
+                                        0
+                                        (cos (degrees angle) * slopeRadius * -1)
+                                    )
+                                |> (\body ->
+                                        Body.rotateAround (Body.frame body |> Frame3d.yAxis) (Angle.degrees angle) body
+                                   )
+                        )
+               )
+            -- back pipe
+            ++ (List.range 1 (stepCount - 1)
+                    |> List.map toFloat
+                    |> List.map
+                        (\step ->
+                            let
+                                angle =
+                                    (90 / stepCount) * step
+                            in
+                            buildPlane 2 roomSize.width
+                                -- move to center of quarter-pipe
+                                |> Body.rotateAround Axis3d.z (Angle.degrees 90)
+                                |> Body.translateBy
+                                    (Vector3d.meters (-roomSize.length / 2 + slopeRadius) (-roomSize.width / 2) slopeRadius)
+                                |> Body.translateBy
+                                    (Vector3d.meters
+                                        (sin (degrees angle) * slopeRadius * -1)
+                                        0
+                                        (cos (degrees angle) * slopeRadius * -1)
+                                    )
+                                |> (\body ->
+                                        Body.rotateAround (Body.frame body |> Frame3d.yAxis) (Angle.degrees -angle) body
+                                   )
+                        )
+               )
         )
 
 
