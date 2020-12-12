@@ -431,7 +431,8 @@ update msg model =
                         { world =
                             initialWorld
                                 |> World.add (floor texture)
-                                |> (\world -> List.foldl World.add world walls)
+                                --|> (\world -> List.foldl World.add world walls)
+                                |> (\world -> List.foldl World.add world panel)
                         , rockets = False
                         , steering = 0
                         , speeding = 0
@@ -706,23 +707,21 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
             List.concat
                 [ addWheelsToWorld world
                     |> World.bodies
-                    |> List.filter
-                        (\body ->
-                            case (Body.data body).id of
-                                Obstacle ->
-                                    let
-                                        eyePoint =
-                                            Viewpoint3d.eyePoint (Camera3d.viewpoint camera)
-
-                                        wallPlane =
-                                            Frame3d.xyPlane (Body.frame body)
-                                    in
-                                    Point3d.signedDistanceFrom wallPlane eyePoint
-                                        |> Quantity.greaterThan Quantity.zero
-
-                                _ ->
-                                    True
-                        )
+                    --|> List.filter
+                    --    (\body ->
+                    --        case (Body.data body).id of
+                    --            Obstacle ->
+                    --                let
+                    --                    eyePoint =
+                    --                        Viewpoint3d.eyePoint (Camera3d.viewpoint camera)
+                    --                    wallPlane =
+                    --                        Frame3d.yzPlane (Body.frame body)
+                    --                in
+                    --                Point3d.signedDistanceFrom wallPlane eyePoint
+                    --                    |> Quantity.greaterThan Quantity.zero
+                    --            _ ->
+                    --                True
+                    --    )
                     |> List.map getTransformedDrawable
                 , List.map
                     (\{ point, time, size } ->
@@ -1429,6 +1428,7 @@ base =
         |> Body.block shape
         |> Body.withBehavior (Body.dynamic (Mass.kilograms 1190))
         |> Body.moveTo offset
+        |> Body.rotateAround Axis3d.z (Angle.degrees 180)
 
 
 wheelRadius =
@@ -1450,7 +1450,7 @@ ball =
         |> Body.sphere shape
         |> Body.withMaterial (Physics.Material.custom { friction = 0.3, bounciness = 0.8 })
         |> Body.withBehavior (Body.dynamic (Mass.kilograms 1))
-        |> Body.moveTo (Point3d.meters 0 0 2)
+        |> Body.moveTo (Point3d.meters -10 0 2)
 
 
 floorSize : Length
@@ -1526,6 +1526,93 @@ roomSize =
     , length = 180
     , height = 60
     }
+
+
+
+-- A wall with ramp(s)
+
+
+panel : List (Body Data)
+panel =
+    List.concat
+        [ -- front wall
+          --  buildPanel roomSize.width roomSize.height
+          --    |> List.map (Body.translateBy (Vector3d.meters (roomSize.length / 2) 0 0))
+          --, --back wall
+          buildPanel roomSize.width roomSize.height (Angle.degrees 45)
+            |> List.map (Body.rotateAround Axis3d.z (Angle.degrees 45))
+
+        --|> List.map (Body.rotateAround Axis3d.z (Angle.degrees 25))
+        --|> List.map (Body.translateBy (Vector3d.meters (roomSize.length / 2) 0 0))
+        ]
+
+
+buildPanel : Float -> Float -> Angle -> List (Body Data)
+buildPanel width height rotation =
+    let
+        -- TODO: Body.compound, Scene3d.group
+        --
+        buildPlane w h origin =
+            let
+                block =
+                    Block3d.centeredOn
+                        origin
+                        ( meters 0.1, meters w, meters h )
+            in
+            Body.block block
+                { id = Obstacle
+                , entity =
+                    Scene3d.block
+                        (Material.uniform Materials.chromium)
+                        block
+                }
+
+        buildWall origin =
+            buildPlane width height origin
+                |> Body.translateBy (Vector3d.meters 0 0 (height / 2))
+
+        ( slopeRadius, stepCount ) =
+            ( 10, 30 )
+
+        len =
+            -- TODO: get a grip on these dimensions
+            roomSize.length - 19
+
+        wall =
+            buildWall Frame3d.atOrigin
+    in
+    [ buildWall Frame3d.atOrigin
+    ]
+        ++ (List.range 1 (stepCount - 1)
+                |> List.map toFloat
+                |> List.map
+                    (\step ->
+                        let
+                            angle =
+                                (90 / stepCount) * step
+
+                            vec =
+                                Vector3d.meters
+                                    -(cos (degrees angle) * slopeRadius)
+                                    0
+                                    -(sin (degrees angle) * slopeRadius)
+                        in
+                        buildPlane width 2 Frame3d.atOrigin
+                            |> Body.translateBy
+                                (Vector3d.meters slopeRadius 0 slopeRadius)
+                            |> (\body ->
+                                    Body.translateBy (Vector3d.placeIn (Body.frame body) vec)
+                                        body
+                               )
+                            |> (\body ->
+                                    Body.rotateAround
+                                        (Body.frame body |> Frame3d.yAxis)
+                                        --Axis3d.y
+                                        (Angle.degrees -angle)
+                                        body
+                               )
+                    )
+           )
 
 
 walls : List (Body Data)
