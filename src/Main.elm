@@ -423,7 +423,7 @@ update msg model =
         ( Loading, TextureResponse (Ok texture) ) ->
             let
                 measure =
-                    roomSize.length / 12
+                    roomSize.length / 10.8
             in
             ( { model
                 | status =
@@ -1495,14 +1495,47 @@ roomSize =
 
 panels : List (Body Data)
 panels =
+    let
+        goalSize =
+            { width = roomSize.width * 0.17
+            , height = roomSize.width * 0.08
+            , depth = 15
+            }
+
+        buildGoal =
+            List.concat
+                [ --left wall
+                  buildPanel ((roomSize.width / 2) - (goalSize.width / 2)) roomSize.height
+                    |> List.map (Body.translateBy (Vector3d.meters 0 ((roomSize.width / 4) + (goalSize.width / 4)) 0))
+
+                --right wall
+                , buildPanel ((roomSize.width / 2) - (goalSize.width / 2)) roomSize.height
+                    |> List.map (Body.translateBy (Vector3d.meters 0 (-(roomSize.width / 4) - (goalSize.width / 4)) 0))
+
+                -- above goal
+                , [ buildPlane goalSize.width (roomSize.height - goalSize.height)
+                        |> Body.translateBy
+                            (Vector3d.meters 0
+                                0
+                                ((roomSize.height * 0.5)
+                                    + (goalSize.height * 0.5)
+                                )
+                            )
+
+                  --back goal
+                  , buildPlane goalSize.width goalSize.height
+                        |> Body.translateBy (Vector3d.meters -15 0 (goalSize.height / 2))
+                  ]
+                ]
+    in
     List.concat
         [ -- front
-          buildPanel roomSize.width roomSize.height
+          buildGoal
             |> List.map (Body.rotateAround Axis3d.z (Angle.degrees 180))
             |> List.map (Body.translateBy (Vector3d.meters (roomSize.length / 2) 0 0))
 
         --back
-        , buildPanel roomSize.width roomSize.height
+        , buildGoal
             |> List.map (Body.translateBy (Vector3d.meters (-roomSize.length / 2) 0 0))
 
         -- left
@@ -1517,32 +1550,33 @@ panels =
         ]
 
 
+buildPlane w h =
+    let
+        block =
+            Block3d.centeredOn Frame3d.atOrigin
+                ( meters 0.1, meters w, meters h )
+    in
+    Body.block block
+        { id = Obstacle
+        , entity =
+            Scene3d.block
+                (Material.uniform Materials.chromium)
+                block
+        }
+
+
 buildPanel : Float -> Float -> List (Body Data)
 buildPanel width height =
     -- A wall with ramp(s)
     let
         -- TODO: Body.compound, Scene3d.group
         --
-        buildPlane w h =
-            let
-                block =
-                    Block3d.centeredOn Frame3d.atOrigin
-                        ( meters 0.1, meters w, meters h )
-            in
-            Body.block block
-                { id = Obstacle
-                , entity =
-                    Scene3d.block
-                        (Material.uniform Materials.chromium)
-                        block
-                }
-
         buildWall =
             buildPlane width height
                 |> Body.translateBy (Vector3d.meters 0 0 (height / 2))
 
         ( slopeRadius, stepCount ) =
-            ( 10, 30 )
+            ( 5, 30 )
     in
     [ buildWall
     ]
