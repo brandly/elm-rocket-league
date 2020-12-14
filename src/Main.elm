@@ -706,21 +706,23 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
             List.concat
                 [ addWheelsToWorld world
                     |> World.bodies
-                    --|> List.filter
-                    --    (\body ->
-                    --        case (Body.data body).id of
-                    --            Obstacle ->
-                    --                let
-                    --                    eyePoint =
-                    --                        Viewpoint3d.eyePoint (Camera3d.viewpoint camera)
-                    --                    wallPlane =
-                    --                        Frame3d.yzPlane (Body.frame body)
-                    --                in
-                    --                Point3d.signedDistanceFrom wallPlane eyePoint
-                    --                    |> Quantity.greaterThan Quantity.zero
-                    --            _ ->
-                    --                True
-                    --    )
+                    |> List.filter
+                        (\body ->
+                            case (Body.data body).id of
+                                Obstacle ->
+                                    let
+                                        eyePoint =
+                                            Viewpoint3d.eyePoint (Camera3d.viewpoint camera)
+
+                                        wallPlane =
+                                            Frame3d.xyPlane (Body.frame body)
+                                    in
+                                    Point3d.signedDistanceFrom wallPlane eyePoint
+                                        |> Quantity.greaterThan Quantity.zero
+
+                                _ ->
+                                    True
+                        )
                     |> List.map getTransformedDrawable
                 , List.map
                     (\{ point, time, size } ->
@@ -1554,7 +1556,7 @@ buildPlane w h =
     let
         block =
             Block3d.centeredOn Frame3d.atOrigin
-                ( meters 0.1, meters w, meters h )
+                ( meters h, meters w, meters 0.1 )
     in
     Body.block block
         { id = Obstacle
@@ -1563,6 +1565,7 @@ buildPlane w h =
                 (Material.uniform Materials.chromium)
                 block
         }
+        |> Body.rotateAround Axis3d.y (Angle.degrees 90)
 
 
 buildPanel : Float -> Float -> List (Body Data)
@@ -1590,7 +1593,7 @@ buildPanel width height =
 
                             vec =
                                 Vector3d.meters
-                                    -(cos (degrees angle) * slopeRadius)
+                                    (cos (degrees angle) * slopeRadius)
                                     0
                                     -(sin (degrees angle) * slopeRadius)
                         in
@@ -1604,8 +1607,7 @@ buildPanel width height =
                             |> (\body ->
                                     Body.rotateAround
                                         (Body.frame body |> Frame3d.yAxis)
-                                        --Axis3d.y
-                                        (Angle.degrees -angle)
+                                        (Angle.degrees (-90 + angle))
                                         body
                                )
                     )
