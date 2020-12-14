@@ -1524,31 +1524,50 @@ panels =
                                 )
                             )
 
-                  --back goal
+                  --back of goal
                   , buildPlane goalSize.width goalSize.height
                         |> Body.translateBy (Vector3d.meters -15 0 (goalSize.height / 2))
                   ]
                 ]
+
+        cornerWallDistance =
+            10
+
+        cornerWallLength =
+            -- a^2 + b^2 = c^2
+            sqrt ((cornerWallDistance ^ 2) * 2) * 2
     in
     List.concat
         [ -- front
           buildGoal
             |> List.map (Body.rotateAround Axis3d.z (Angle.degrees 180))
             |> List.map (Body.translateBy (Vector3d.meters (roomSize.length / 2) 0 0))
+        , buildPanel cornerWallLength roomSize.height
+            |> List.map (Body.rotateAround Axis3d.z (Angle.degrees (180 - 45)))
+            |> List.map (Body.translateBy (Vector3d.meters (roomSize.length / 2 - cornerWallDistance) (-roomSize.width / 2 + cornerWallDistance) 0))
+
+        -- right
+        , buildPanel roomSize.length roomSize.height
+            |> List.map (Body.rotateAround Axis3d.z (Angle.degrees 90))
+            |> List.map (Body.translateBy (Vector3d.meters 0 (-roomSize.width / 2) 0))
+        , buildPanel cornerWallLength roomSize.height
+            |> List.map (Body.rotateAround Axis3d.z (Angle.degrees 45))
+            |> List.map (Body.translateBy (Vector3d.meters (-roomSize.length / 2 + cornerWallDistance) (-roomSize.width / 2 + cornerWallDistance) 0))
 
         --back
         , buildGoal
             |> List.map (Body.translateBy (Vector3d.meters (-roomSize.length / 2) 0 0))
+        , buildPanel cornerWallLength roomSize.height
+            |> List.map (Body.rotateAround Axis3d.z (Angle.degrees -45))
+            |> List.map (Body.translateBy (Vector3d.meters (-roomSize.length / 2 + cornerWallDistance) (roomSize.width / 2 - cornerWallDistance) 0))
 
         -- left
         , buildPanel roomSize.length roomSize.height
-            |> List.map (Body.rotateAround Axis3d.z (Angle.degrees 90))
-            |> List.map (Body.translateBy (Vector3d.meters 0 (-roomSize.width / 2) 0))
-
-        -- right
-        , buildPanel roomSize.length roomSize.height
             |> List.map (Body.rotateAround Axis3d.z (Angle.degrees -90))
             |> List.map (Body.translateBy (Vector3d.meters 0 (roomSize.width / 2) 0))
+        , buildPanel cornerWallLength roomSize.height
+            |> List.map (Body.rotateAround Axis3d.z (Angle.degrees (-180 + 45)))
+            |> List.map (Body.translateBy (Vector3d.meters (roomSize.length / 2 - cornerWallDistance) (roomSize.width / 2 - cornerWallDistance) 0))
         ]
 
 
