@@ -612,14 +612,7 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
                         |> List.filter
                             (Body.data
                                 >> .id
-                                >> (\id ->
-                                        case id of
-                                            Car _ ->
-                                                True
-
-                                            _ ->
-                                                False
-                                   )
+                                >> isCar
                             )
                         |> List.head
 
@@ -629,14 +622,7 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
                         |> List.filter
                             (Body.data
                                 >> .id
-                                >> (\id ->
-                                        case id of
-                                            Ball ->
-                                                True
-
-                                            _ ->
-                                                False
-                                   )
+                                >> isBall
                             )
                         |> List.head
 
