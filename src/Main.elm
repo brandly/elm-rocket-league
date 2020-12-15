@@ -1470,7 +1470,7 @@ ball =
         |> Body.sphere shape
         |> Body.withMaterial (Physics.Material.custom { friction = 0.3, bounciness = 0.8 })
         |> Body.withBehavior (Body.dynamic (Mass.kilograms 1))
-        |> Body.moveTo (Point3d.meters -10 0 2)
+        |> Body.moveTo (Point3d.meters 0 0 2)
 
 
 floorSize : Length
