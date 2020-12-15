@@ -444,6 +444,13 @@ update msg model =
             let
                 measure =
                     roomSize.length / 10.8
+
+                refillRing x y =
+                    [ ( -measure * x, measure * y )
+                    , ( -measure * x, -measure * y )
+                    , ( measure * x, measure * y )
+                    , ( measure * x, -measure * y )
+                    ]
             in
             ( { model
                 | status =
@@ -462,47 +469,25 @@ update msg model =
                         , refills =
                             List.concat
                                 [ -- four surrounding center
-                                  [ ( measure, 0 )
-                                  , ( -measure, 0 )
-                                  , ( 0, measure )
-                                  , ( 0, -measure )
+                                  List.concat
+                                    [ [ ( measure, 0 )
+                                      , ( -measure, 0 )
+                                      , ( 0, measure )
+                                      , ( 0, -measure )
 
-                                  -- center line
-                                  , ( measure * 2.7, 0 )
-                                  , ( -measure * 2.7, 0 )
-                                  , ( measure * 4.1, 0 )
-                                  , ( -measure * 4.1, 0 )
-
-                                  --
-                                  , ( -measure * 4.05, measure * 1.75 )
-                                  , ( -measure * 4.05, -measure * 1.75 )
-                                  , ( measure * 4.05, measure * 1.75 )
-                                  , ( measure * 4.05, -measure * 1.75 )
-
-                                  --
-                                  , ( -measure * 3.2, measure * 0.9 )
-                                  , ( -measure * 3.2, -measure * 0.9 )
-                                  , ( measure * 3.2, measure * 0.9 )
-                                  , ( measure * 3.2, -measure * 0.9 )
-
-                                  --
-                                  , ( -measure * 2.2, measure * 1.75 )
-                                  , ( -measure * 2.2, -measure * 1.75 )
-                                  , ( measure * 2.2, measure * 1.75 )
-                                  , ( measure * 2.2, -measure * 1.75 )
-
-                                  --
-                                  , ( -measure * 2.4, measure * 3.4 )
-                                  , ( -measure * 2.4, -measure * 3.4 )
-                                  , ( measure * 2.4, measure * 3.4 )
-                                  , ( measure * 2.4, -measure * 3.4 )
-
-                                  --
-                                  , ( -measure, measure * 2.0 )
-                                  , ( -measure, -measure * 2.0 )
-                                  , ( measure, measure * 2.0 )
-                                  , ( measure, -measure * 2.0 )
-                                  ]
+                                      -- center line
+                                      , ( measure * 2.7, 0 )
+                                      , ( -measure * 2.7, 0 )
+                                      , ( measure * 4.1, 0 )
+                                      , ( -measure * 4.1, 0 )
+                                      ]
+                                    , --
+                                      refillRing 4.05 1.75
+                                    , refillRing 3.2 0.9
+                                    , refillRing 2.2 1.75
+                                    , refillRing 2.4 3.4
+                                    , refillRing 1 2
+                                    ]
                                     |> List.map
                                         (\( x, y ) ->
                                             { point = Point3d.meters x y 0
