@@ -53,6 +53,21 @@ type EntityId
     | Obstacle
 
 
+isBall : EntityId -> Bool
+isBall id =
+    id == Ball
+
+
+isCar : EntityId -> Bool
+isCar id =
+    case id of
+        Car _ ->
+            True
+
+        _ ->
+            False
+
+
 type CameraFocus
     = BallCam
     | ForwardCam
@@ -116,9 +131,9 @@ type RefillSize
     | SmallRefill
 
 
-boostIsActive : Float -> ( Point3d Meters WorldCoordinates, Float ) -> Bool
-boostIsActive lastTick ( _, time ) =
-    (lastTick - time) > boostSettings.reloadTime
+refillIsActive : Float -> Refill -> Bool
+refillIsActive currentTime { time } =
+    (currentTime - time) > boostSettings.reloadTime
 
 
 boostSettings =
@@ -243,14 +258,19 @@ update msg model =
                         |> List.filter
                             (Body.data
                                 >> .id
-                                >> (\id ->
-                                        case id of
-                                            Car _ ->
-                                                True
+                                >> isCar
+                            )
+                        |> List.head
+                        |> Maybe.map Body.originPoint
+                        |> Maybe.withDefault (Point3d.meters 0 0 0)
 
-                                            _ ->
-                                                False
-                                   )
+                ballPoint =
+                    game.world
+                        |> World.bodies
+                        |> List.filter
+                            (Body.data
+                                >> .id
+                                >> isBall
                             )
                         |> List.head
                         |> Maybe.map Body.originPoint
@@ -262,7 +282,7 @@ update msg model =
                 carHits : Refill -> Bool
                 carHits { point, time } =
                     not fullTank
-                        && ((game.lastTick - time) > boostSettings.reloadTime)
+                        && ((currentTick - time) > boostSettings.reloadTime)
                         && (Point3d.distanceFrom carPoint point |> Length.inMeters)
                         < 2.5
 
@@ -293,32 +313,32 @@ update msg model =
                                 |> List.sum
                     in
                     min boostSettings.max (adding + boostTank)
+
+                bodyUpdate body =
+                    case (Body.data body).id of
+                        Car wheels ->
+                            let
+                                boost =
+                                    if game.rockets && game.boostTank > 0 then
+                                        Body.applyForce (Force.newtons 30000)
+                                            (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
+                                            (Body.originPoint body)
+
+                                    else
+                                        identity
+                            in
+                            simulateCar (Duration.milliseconds tick) game wheels body
+                                |> boost
+
+                        _ ->
+                            body
             in
             ( keepPlaying
                 { game
                     | world =
                         game.world
-                            |> World.update
-                                (\body ->
-                                    case (Body.data body).id of
-                                        Car wheels ->
-                                            let
-                                                boost =
-                                                    if game.rockets && game.boostTank > 0 then
-                                                        Body.applyForce (Force.newtons 30000)
-                                                            (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
-                                                            (Body.originPoint body)
-
-                                                    else
-                                                        identity
-                                            in
-                                            simulateCar (Duration.milliseconds tick) game wheels body
-                                                |> boost
-
-                                        _ ->
-                                            body
-                                )
-                            |> World.simulate (Duration.seconds (1 / 60))
+                            |> World.update bodyUpdate
+                            |> World.simulate (Duration.seconds (tick / 1000))
                     , boostTank =
                         game.boostTank
                             |> applyRefills
@@ -328,7 +348,7 @@ update msg model =
                         game.refills
                             |> List.map
                                 (\refill ->
-                                    if carHits refill then
+                                    if refillIsActive currentTick refill && carHits refill then
                                         { refill | time = currentTick }
 
                                     else
@@ -423,7 +443,14 @@ update msg model =
         ( Loading, TextureResponse (Ok texture) ) ->
             let
                 measure =
-                    roomSize.length / 12
+                    roomSize.length / 10.8
+
+                refillRing x y =
+                    [ ( -measure * x, measure * y )
+                    , ( -measure * x, -measure * y )
+                    , ( measure * x, measure * y )
+                    , ( measure * x, -measure * y )
+                    ]
             in
             ( { model
                 | status =
@@ -431,7 +458,7 @@ update msg model =
                         { world =
                             initialWorld
                                 |> World.add (floor texture)
-                                |> (\world -> List.foldl World.add world walls)
+                                |> (\world -> List.foldl World.add world panels)
                         , rockets = False
                         , steering = 0
                         , speeding = 0
@@ -442,47 +469,25 @@ update msg model =
                         , refills =
                             List.concat
                                 [ -- four surrounding center
-                                  [ ( measure, 0 )
-                                  , ( -measure, 0 )
-                                  , ( 0, measure )
-                                  , ( 0, -measure )
+                                  List.concat
+                                    [ [ ( measure, 0 )
+                                      , ( -measure, 0 )
+                                      , ( 0, measure )
+                                      , ( 0, -measure )
 
-                                  -- center line
-                                  , ( measure * 2.7, 0 )
-                                  , ( -measure * 2.7, 0 )
-                                  , ( measure * 4.1, 0 )
-                                  , ( -measure * 4.1, 0 )
-
-                                  --
-                                  , ( -measure * 4.05, measure * 1.75 )
-                                  , ( -measure * 4.05, -measure * 1.75 )
-                                  , ( measure * 4.05, measure * 1.75 )
-                                  , ( measure * 4.05, -measure * 1.75 )
-
-                                  --
-                                  , ( -measure * 3.2, measure * 0.9 )
-                                  , ( -measure * 3.2, -measure * 0.9 )
-                                  , ( measure * 3.2, measure * 0.9 )
-                                  , ( measure * 3.2, -measure * 0.9 )
-
-                                  --
-                                  , ( -measure * 2.2, measure * 1.75 )
-                                  , ( -measure * 2.2, -measure * 1.75 )
-                                  , ( measure * 2.2, measure * 1.75 )
-                                  , ( measure * 2.2, -measure * 1.75 )
-
-                                  --
-                                  , ( -measure * 2.4, measure * 3.4 )
-                                  , ( -measure * 2.4, -measure * 3.4 )
-                                  , ( measure * 2.4, measure * 3.4 )
-                                  , ( measure * 2.4, -measure * 3.4 )
-
-                                  --
-                                  , ( -measure, measure * 2.0 )
-                                  , ( -measure, -measure * 2.0 )
-                                  , ( measure, measure * 2.0 )
-                                  , ( measure, -measure * 2.0 )
-                                  ]
+                                      -- center line
+                                      , ( measure * 2.7, 0 )
+                                      , ( -measure * 2.7, 0 )
+                                      , ( measure * 4.1, 0 )
+                                      , ( -measure * 4.1, 0 )
+                                      ]
+                                    , --
+                                      refillRing 4.05 1.75
+                                    , refillRing 3.2 0.9
+                                    , refillRing 2.2 1.75
+                                    , refillRing 2.4 3.4
+                                    , refillRing 1 2
+                                    ]
                                     |> List.map
                                         (\( x, y ) ->
                                             { point = Point3d.meters x y 0
@@ -607,14 +612,7 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
                         |> List.filter
                             (Body.data
                                 >> .id
-                                >> (\id ->
-                                        case id of
-                                            Car _ ->
-                                                True
-
-                                            _ ->
-                                                False
-                                   )
+                                >> isCar
                             )
                         |> List.head
 
@@ -624,14 +622,7 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
                         |> List.filter
                             (Body.data
                                 >> .id
-                                >> (\id ->
-                                        case id of
-                                            Ball ->
-                                                True
-
-                                            _ ->
-                                                False
-                                   )
+                                >> isBall
                             )
                         |> List.head
 
@@ -725,8 +716,8 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
                         )
                     |> List.map getTransformedDrawable
                 , List.map
-                    (\{ point, time, size } ->
-                        renderRefill point (boostIsActive lastTick ( point, time )) size
+                    (\refill ->
+                        renderRefill (refillIsActive lastTick refill) refill
                     )
                     refills
                 ]
@@ -867,8 +858,8 @@ initialWorld =
         |> World.add ball
 
 
-renderRefill : Point3d Meters WorldCoordinates -> Bool -> RefillSize -> Scene3d.Entity WorldCoordinates
-renderRefill point active size =
+renderRefill : Bool -> Refill -> Scene3d.Entity WorldCoordinates
+renderRefill active { point, size } =
     let
         shape =
             Cylinder3d.centeredOn point
@@ -1464,50 +1455,17 @@ floor texture =
         point x y =
             Point3d.meters x y 0
 
-        fullSize =
-            { width = Length.inMeters floorSize / 2
-            , length = Length.inMeters floorSize
-            }
-
         texturedMaterial =
             Material.texturedNonmetal
                 { baseColor = texture
                 , roughness = Material.constant 0.25
                 }
 
-        tileCount =
-            10
-
-        tileSize =
-            { width = fullSize.width / tileCount
-            , length = fullSize.length / tileCount
-            }
-
-        coords : List ( Float, Float )
-        coords =
-            List.range 0 14
-                |> List.map (\x -> x * 10 - 75)
-                |> List.concatMap
-                    (\x ->
-                        List.range 0 12
-                            |> List.map (\y -> y * 10 - 65)
-                            |> List.map (\y -> ( toFloat x, toFloat y ))
-                    )
-
-        entities =
-            -- TODO: is there an easier way to say "repeat texture every x pixels"?
-            coords
-                |> List.map
-                    (\( x, y ) ->
-                        Scene3d.quad texturedMaterial
-                            (point x y)
-                            (point x (y + 10))
-                            (point (x + 10) (y + 10))
-                            (point (x + 10) y)
-                    )
+        length =
+            180
 
         half =
-            roomSize.length / 2
+            length / 2
     in
     Body.plane
         { id = Obstacle
@@ -1523,155 +1481,147 @@ floor texture =
 
 roomSize =
     { width = 131
-    , length = 180
+    , length = 161
     , height = 60
     }
 
 
-walls : List (Body Data)
-walls =
+panels : List (Body Data)
+panels =
     let
-        buildPlane height length =
-            Body.plane
-                { id = Obstacle
-                , entity =
-                    Scene3d.quad
-                        (Material.uniform Materials.chromium)
-                        (Point3d.meters 0 0 0)
-                        (Point3d.meters 0 height 0)
-                        (Point3d.meters length height 0)
-                        (Point3d.meters length 0 0)
-                }
+        goalSize =
+            { width = roomSize.width * 0.17
+            , height = roomSize.width * 0.08
+            , depth = 15
+            }
 
-        len =
-            -- TODO: get a grip on these dimensions
-            roomSize.length - 19
+        buildGoal =
+            List.concat
+                [ --left wall
+                  buildPanel ((roomSize.width / 2) - (goalSize.width / 2)) roomSize.height
+                    |> List.map (Body.translateBy (Vector3d.meters 0 ((roomSize.width / 4) + (goalSize.width / 4)) 0))
 
+                --right wall
+                , buildPanel ((roomSize.width / 2) - (goalSize.width / 2)) roomSize.height
+                    |> List.map (Body.translateBy (Vector3d.meters 0 (-(roomSize.width / 4) - (goalSize.width / 4)) 0))
+
+                -- above goal
+                , [ buildPlane goalSize.width (roomSize.height - goalSize.height)
+                        |> Body.translateBy
+                            (Vector3d.meters 0
+                                0
+                                ((roomSize.height * 0.5)
+                                    + (goalSize.height * 0.5)
+                                )
+                            )
+
+                  --back of goal
+                  , buildPlane goalSize.width goalSize.height
+                        |> Body.translateBy (Vector3d.meters -15 0 (goalSize.height / 2))
+                  ]
+                ]
+
+        cornerWallDistance =
+            10
+
+        cornerWallLength =
+            -- a^2 + b^2 = c^2
+            sqrt ((cornerWallDistance ^ 2) * 2) * 2
+    in
+    List.concat
+        [ -- front
+          buildGoal
+            |> List.map (Body.rotateAround Axis3d.z (Angle.degrees 180))
+            |> List.map (Body.translateBy (Vector3d.meters (roomSize.length / 2) 0 0))
+        , buildPanel cornerWallLength roomSize.height
+            |> List.map (Body.rotateAround Axis3d.z (Angle.degrees (180 - 45)))
+            |> List.map (Body.translateBy (Vector3d.meters (roomSize.length / 2 - cornerWallDistance) (-roomSize.width / 2 + cornerWallDistance) 0))
+
+        -- right
+        , buildPanel roomSize.length roomSize.height
+            |> List.map (Body.rotateAround Axis3d.z (Angle.degrees 90))
+            |> List.map (Body.translateBy (Vector3d.meters 0 (-roomSize.width / 2) 0))
+        , buildPanel cornerWallLength roomSize.height
+            |> List.map (Body.rotateAround Axis3d.z (Angle.degrees 45))
+            |> List.map (Body.translateBy (Vector3d.meters (-roomSize.length / 2 + cornerWallDistance) (-roomSize.width / 2 + cornerWallDistance) 0))
+
+        --back
+        , buildGoal
+            |> List.map (Body.translateBy (Vector3d.meters (-roomSize.length / 2) 0 0))
+        , buildPanel cornerWallLength roomSize.height
+            |> List.map (Body.rotateAround Axis3d.z (Angle.degrees -45))
+            |> List.map (Body.translateBy (Vector3d.meters (-roomSize.length / 2 + cornerWallDistance) (roomSize.width / 2 - cornerWallDistance) 0))
+
+        -- left
+        , buildPanel roomSize.length roomSize.height
+            |> List.map (Body.rotateAround Axis3d.z (Angle.degrees -90))
+            |> List.map (Body.translateBy (Vector3d.meters 0 (roomSize.width / 2) 0))
+        , buildPanel cornerWallLength roomSize.height
+            |> List.map (Body.rotateAround Axis3d.z (Angle.degrees (-180 + 45)))
+            |> List.map (Body.translateBy (Vector3d.meters (roomSize.length / 2 - cornerWallDistance) (roomSize.width / 2 - cornerWallDistance) 0))
+        ]
+
+
+buildPlane w h =
+    let
+        block =
+            Block3d.centeredOn Frame3d.atOrigin
+                ( meters h, meters w, meters 0.1 )
+    in
+    Body.block block
+        { id = Obstacle
+        , entity =
+            Scene3d.block
+                (Material.uniform Materials.chromium)
+                block
+        }
+        |> Body.rotateAround Axis3d.y (Angle.degrees 90)
+
+
+buildPanel : Float -> Float -> List (Body Data)
+buildPanel width height =
+    -- A wall with ramp(s)
+    let
+        -- TODO: Body.compound, Scene3d.group
+        --
         buildWall =
-            buildPlane roomSize.height
-
-        sideWall =
-            buildWall len
-
-        frontBackWall =
-            buildWall roomSize.width
+            buildPlane width height
+                |> Body.translateBy (Vector3d.meters 0 0 (height / 2))
 
         ( slopeRadius, stepCount ) =
-            ( 10, 30 )
+            ( 5, 30 )
     in
-    List.map (Body.withBehavior Body.static)
-        ([ sideWall
-            |> Body.rotateAround Axis3d.x (Angle.degrees 90)
-            |> Body.translateBy (Vector3d.meters -(len / 2) (roomSize.width / 2) 0)
-         , sideWall
-            |> Body.rotateAround Axis3d.x (Angle.degrees -90)
-            |> Body.translateBy (Vector3d.meters -(len / 2) -(roomSize.width / 2) 60)
-         , frontBackWall
-            |> Body.rotateAround Axis3d.x (Angle.degrees 90)
-            |> Body.rotateAround Axis3d.y (Angle.degrees 90)
-            |> Body.translateBy (Vector3d.meters -(len / 2) -(roomSize.width / 2) 0)
-         , frontBackWall
-            |> Body.rotateAround Axis3d.x (Angle.degrees 90)
-            |> Body.rotateAround Axis3d.y (Angle.degrees -90)
-            |> Body.translateBy (Vector3d.meters (len / 2) (roomSize.width / 2) 0)
-         ]
-            -- left pipe
-            ++ (List.range 1 (stepCount - 1)
-                    |> List.map toFloat
-                    |> List.map
-                        (\step ->
-                            let
-                                angle =
-                                    (90 / stepCount) * step
-                            in
-                            buildPlane 2 len
-                                -- move to center of quarter-pipe
-                                |> Body.translateBy
-                                    (Vector3d.meters (-len / 2) (roomSize.width / 2 - slopeRadius) slopeRadius)
-                                |> Body.translateBy
-                                    (Vector3d.meters 0
-                                        (sin (degrees angle) * slopeRadius)
-                                        (cos (degrees angle) * slopeRadius * -1)
-                                    )
-                                |> (\body ->
-                                        Body.rotateAround (Body.frame body |> Frame3d.xAxis) (Angle.degrees angle) body
-                                   )
-                        )
-               )
-            -- right pipe
-            ++ (List.range 1 (stepCount - 1)
-                    |> List.map toFloat
-                    |> List.map
-                        (\step ->
-                            let
-                                angle =
-                                    (90 / stepCount) * step
-                            in
-                            buildPlane 2 len
-                                -- move to center of quarter-pipe
-                                |> Body.translateBy
-                                    (Vector3d.meters (-len / 2) (-roomSize.width / 2 + slopeRadius) slopeRadius)
-                                |> Body.translateBy
-                                    (Vector3d.meters 0
-                                        (sin (degrees angle) * slopeRadius * -1)
-                                        (cos (degrees angle) * slopeRadius * -1)
-                                    )
-                                |> (\body ->
-                                        Body.rotateAround (Body.frame body |> Frame3d.xAxis) (Angle.degrees -angle) body
-                                   )
-                        )
-               )
-            -- front pipe
-            ++ (List.range 1 (stepCount - 1)
-                    |> List.map toFloat
-                    |> List.map
-                        (\step ->
-                            let
-                                angle =
-                                    (90 / stepCount) * step
-                            in
-                            buildPlane 2 roomSize.width
-                                -- move to center of quarter-pipe
-                                |> Body.rotateAround Axis3d.z (Angle.degrees 90)
-                                |> Body.translateBy
-                                    (Vector3d.meters (len / 2 - slopeRadius) (-roomSize.width / 2) slopeRadius)
-                                |> Body.translateBy
-                                    (Vector3d.meters
-                                        (sin (degrees angle) * slopeRadius)
-                                        0
-                                        (cos (degrees angle) * slopeRadius * -1)
-                                    )
-                                |> (\body ->
-                                        Body.rotateAround (Body.frame body |> Frame3d.yAxis) (Angle.degrees angle) body
-                                   )
-                        )
-               )
-            -- back pipe
-            ++ (List.range 1 (stepCount - 1)
-                    |> List.map toFloat
-                    |> List.map
-                        (\step ->
-                            let
-                                angle =
-                                    (90 / stepCount) * step
-                            in
-                            buildPlane 2 roomSize.width
-                                -- move to center of quarter-pipe
-                                |> Body.rotateAround Axis3d.z (Angle.degrees 90)
-                                |> Body.translateBy
-                                    (Vector3d.meters (-len / 2 + slopeRadius) (-roomSize.width / 2) slopeRadius)
-                                |> Body.translateBy
-                                    (Vector3d.meters
-                                        (sin (degrees angle) * slopeRadius * -1)
-                                        0
-                                        (cos (degrees angle) * slopeRadius * -1)
-                                    )
-                                |> (\body ->
-                                        Body.rotateAround (Body.frame body |> Frame3d.yAxis) (Angle.degrees -angle) body
-                                   )
-                        )
-               )
-        )
+    [ buildWall
+    ]
+        ++ (List.range 1 (stepCount - 1)
+                |> List.map toFloat
+                |> List.map
+                    (\step ->
+                        let
+                            angle =
+                                (90 / stepCount) * step
+
+                            vec =
+                                Vector3d.meters
+                                    (cos (degrees angle) * slopeRadius)
+                                    0
+                                    -(sin (degrees angle) * slopeRadius)
+                        in
+                        buildPlane width 2
+                            |> Body.translateBy
+                                (Vector3d.meters slopeRadius 0 slopeRadius)
+                            |> (\body ->
+                                    Body.translateBy (Vector3d.placeIn (Body.frame body) vec)
+                                        body
+                               )
+                            |> (\body ->
+                                    Body.rotateAround
+                                        (Body.frame body |> Frame3d.yAxis)
+                                        (Angle.degrees (-90 + angle))
+                                        body
+                               )
+                    )
+           )
 
 
 getTransformedDrawable : Body Data -> Scene3d.Entity WorldCoordinates
