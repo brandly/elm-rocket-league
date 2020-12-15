@@ -53,6 +53,21 @@ type EntityId
     | Obstacle
 
 
+isBall : EntityId -> Bool
+isBall id =
+    id == Ball
+
+
+isCar : EntityId -> Bool
+isCar id =
+    case id of
+        Car _ ->
+            True
+
+        _ ->
+            False
+
+
 type CameraFocus
     = BallCam
     | ForwardCam
@@ -116,9 +131,9 @@ type RefillSize
     | SmallRefill
 
 
-boostIsActive : Float -> ( Point3d Meters WorldCoordinates, Float ) -> Bool
-boostIsActive lastTick ( _, time ) =
-    (lastTick - time) > boostSettings.reloadTime
+refillIsActive : Float -> Refill -> Bool
+refillIsActive currentTime { time } =
+    (currentTime - time) > boostSettings.reloadTime
 
 
 boostSettings =
@@ -243,14 +258,19 @@ update msg model =
                         |> List.filter
                             (Body.data
                                 >> .id
-                                >> (\id ->
-                                        case id of
-                                            Car _ ->
-                                                True
+                                >> isCar
+                            )
+                        |> List.head
+                        |> Maybe.map Body.originPoint
+                        |> Maybe.withDefault (Point3d.meters 0 0 0)
 
-                                            _ ->
-                                                False
-                                   )
+                ballPoint =
+                    game.world
+                        |> World.bodies
+                        |> List.filter
+                            (Body.data
+                                >> .id
+                                >> isBall
                             )
                         |> List.head
                         |> Maybe.map Body.originPoint
@@ -262,7 +282,7 @@ update msg model =
                 carHits : Refill -> Bool
                 carHits { point, time } =
                     not fullTank
-                        && ((game.lastTick - time) > boostSettings.reloadTime)
+                        && ((currentTick - time) > boostSettings.reloadTime)
                         && (Point3d.distanceFrom carPoint point |> Length.inMeters)
                         < 2.5
 
@@ -293,32 +313,32 @@ update msg model =
                                 |> List.sum
                     in
                     min boostSettings.max (adding + boostTank)
+
+                bodyUpdate body =
+                    case (Body.data body).id of
+                        Car wheels ->
+                            let
+                                boost =
+                                    if game.rockets && game.boostTank > 0 then
+                                        Body.applyForce (Force.newtons 30000)
+                                            (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
+                                            (Body.originPoint body)
+
+                                    else
+                                        identity
+                            in
+                            simulateCar (Duration.milliseconds tick) game wheels body
+                                |> boost
+
+                        _ ->
+                            body
             in
             ( keepPlaying
                 { game
                     | world =
                         game.world
-                            |> World.update
-                                (\body ->
-                                    case (Body.data body).id of
-                                        Car wheels ->
-                                            let
-                                                boost =
-                                                    if game.rockets && game.boostTank > 0 then
-                                                        Body.applyForce (Force.newtons 30000)
-                                                            (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
-                                                            (Body.originPoint body)
-
-                                                    else
-                                                        identity
-                                            in
-                                            simulateCar (Duration.milliseconds tick) game wheels body
-                                                |> boost
-
-                                        _ ->
-                                            body
-                                )
-                            |> World.simulate (Duration.seconds (1 / 60))
+                            |> World.update bodyUpdate
+                            |> World.simulate (Duration.seconds (tick / 1000))
                     , boostTank =
                         game.boostTank
                             |> applyRefills
@@ -725,8 +745,8 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
                         )
                     |> List.map getTransformedDrawable
                 , List.map
-                    (\{ point, time, size } ->
-                        renderRefill point (boostIsActive lastTick ( point, time )) size
+                    (\refill ->
+                        renderRefill (refillIsActive lastTick refill) refill
                     )
                     refills
                 ]
@@ -867,8 +887,8 @@ initialWorld =
         |> World.add ball
 
 
-renderRefill : Point3d Meters WorldCoordinates -> Bool -> RefillSize -> Scene3d.Entity WorldCoordinates
-renderRefill point active size =
+renderRefill : Bool -> Refill -> Scene3d.Entity WorldCoordinates
+renderRefill active { point, size } =
     let
         shape =
             Cylinder3d.centeredOn point
