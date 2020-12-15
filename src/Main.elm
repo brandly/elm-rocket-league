@@ -348,7 +348,7 @@ update msg model =
                         game.refills
                             |> List.map
                                 (\refill ->
-                                    if carHits refill then
+                                    if refillIsActive currentTick refill && carHits refill then
                                         { refill | time = currentTick }
 
                                     else
