@@ -604,18 +604,18 @@ view model =
 viewGame : ScreenSize -> Game -> List (Html Msg)
 viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
     let
+        car =
+            world
+                |> World.bodies
+                |> List.filter
+                    (Body.data
+                        >> .id
+                        >> isCar
+                    )
+                |> List.head
+
         camera =
             let
-                car =
-                    world
-                        |> World.bodies
-                        |> List.filter
-                            (Body.data
-                                >> .id
-                                >> isCar
-                            )
-                        |> List.head
-
                 ballBody =
                     world
                         |> World.bodies
@@ -693,9 +693,10 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
                 , verticalFieldOfView = Angle.degrees 24
                 }
 
+        drawables : List (Scene3d.Entity WorldCoordinates)
         drawables =
             List.concat
-                [ addWheelsToWorld world
+                [ world
                     |> World.bodies
                     |> List.filter
                         (\body ->
@@ -715,6 +716,12 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
                                     True
                         )
                     |> List.map getTransformedDrawable
+                , case ( car, Maybe.map (Body.data >> .id) car ) of
+                    ( Just car_, Just (Car wheels) ) ->
+                        renderWheels car_ wheels
+
+                    _ ->
+                        []
                 , List.map
                     (\refill ->
                         renderRefill (refillIsActive lastTick refill) refill
@@ -781,69 +788,46 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
     ]
 
 
-addWheelsToWorld : World Data -> World Data
-addWheelsToWorld world =
-    let
-        maybeCar =
-            world
-                |> World.bodies
-                |> List.filterMap
-                    (\b ->
-                        case (Body.data b).id of
-                            Car wheels ->
-                                Just ( wheels, b )
+renderWheels : Body Data -> List Wheel -> List (Scene3d.Entity WorldCoordinates)
+renderWheels car wheels =
+    List.map
+        (\wheel ->
+            let
+                frame =
+                    Body.frame car
 
-                            _ ->
-                                Nothing
-                    )
-                |> List.head
-    in
-    case maybeCar of
-        Just ( wheels, car ) ->
-            List.foldl
-                (\wheel ->
-                    let
-                        frame =
-                            Body.frame car
+                position =
+                    wheel.chassisConnectionPoint
+                        |> Point3d.placeIn frame
 
-                        position =
-                            wheel.chassisConnectionPoint
-                                |> Point3d.placeIn (Body.frame car)
+                downDirection =
+                    carSettings.downDirection
+                        |> Direction3d.placeIn frame
 
-                        downDirection =
-                            carSettings.downDirection
-                                |> Direction3d.placeIn (Body.frame car)
+                newPosition =
+                    position |> Point3d.translateBy (Vector3d.withLength wheel.suspensionLength downDirection)
 
-                        rightDirection =
-                            carSettings.rightDirection
-                                |> Direction3d.placeIn (Body.frame car)
-
-                        newPosition =
-                            position |> Point3d.translateBy (Vector3d.withLength wheel.suspensionLength downDirection)
-
-                        newFrame =
-                            frame
-                                |> Frame3d.moveTo newPosition
-                                --|> Frame3d.rotateAround (Axis3d.through newPosition rightDirection) wheel.rotation
-                                |> Frame3d.rotateAround (Axis3d.through newPosition downDirection) wheel.steering
-                    in
-                    World.add
-                        (Body.cylinder wheelShape
-                            { id = Car []
-                            , entity = wheelBody
-                            }
-                            |> Body.placeIn newFrame
-                        )
-                )
-                world
-                wheels
-
-        Nothing ->
-            world
+                newFrame =
+                    frame
+                        |> Frame3d.moveTo newPosition
+                        |> Frame3d.rotateAround (Axis3d.through newPosition downDirection) wheel.steering
+            in
+            wheelBody
+                |> Scene3d.placeIn newFrame
+        )
+        wheels
 
 
 wheelBody =
     Scene3d.cylinderWithShadow (Material.uniform Materials.chromium) wheelShape
+
+
+wheelShape : Cylinder3d Meters BodyCoordinates
+wheelShape =
+    Cylinder3d.centeredOn
+        Point3d.origin
+        Direction3d.y
+        { radius = carSettings.radius, length = Length.meters 0.3 }
 
 
 initialWorld : World Data
@@ -1358,14 +1342,6 @@ computeImpulseDenominator body point normal =
 
         Nothing ->
             dot
-
-
-wheelShape : Cylinder3d Meters BodyCoordinates
-wheelShape =
-    Cylinder3d.centeredOn
-        Point3d.origin
-        Direction3d.y
-        { radius = carSettings.radius, length = Length.meters 0.3 }
 
 
 base : Body Data
