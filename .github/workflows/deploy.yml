@@ -1,0 +1,36 @@
+name: Deploy to itch.io
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-node@v1
+        with:
+          node-version: "12"
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.npm
+            ~/.elm
+            elm-stuff
+          key: ${{ runner.os }}-cache
+
+      - run: npm install
+
+      - run: |
+          npm run production
+
+      - uses: josephbmanley/butler-publish-itchio-action@master
+        env:
+          BUTLER_CREDENTIALS: ${{ secrets.BUTLER_CREDENTIALS }}
+          CHANNEL: html
+          ITCH_GAME: elm-rocket-league
+          ITCH_USER: brandly
+          PACKAGE: dist
