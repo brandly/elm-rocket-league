@@ -1458,7 +1458,7 @@ floor texture =
 roomSize =
     { width = 131
     , length = 161
-    , height = 60
+    , height = 40
     }
 
 
@@ -1560,16 +1560,15 @@ buildPanel width height =
     let
         -- TODO: Body.compound, Scene3d.group
         --
-        buildWall =
+        wall =
             buildPlane width height
                 |> Body.translateBy (Vector3d.meters 0 0 (height / 2))
 
         ( slopeRadius, stepCount ) =
             ( 5, 30 )
-    in
-    [ buildWall
-    ]
-        ++ (List.range 1 (stepCount - 1)
+
+        bottomSlope =
+            List.range 1 (stepCount - 1)
                 |> List.map toFloat
                 |> List.map
                     (\step ->
@@ -1597,7 +1596,18 @@ buildPanel width height =
                                         body
                                )
                     )
-           )
+
+        slopeAxis =
+            Axis3d.through (Point3d.meters slopeRadius 0 slopeRadius) Direction3d.x
+
+        topSlope =
+            bottomSlope
+                |> List.map (Body.rotateAround slopeAxis (Angle.degrees 180))
+                |> List.map (Body.translateBy (Vector3d.meters 0 0 (height - slopeRadius)))
+    in
+    wall
+        :: bottomSlope
+        ++ topSlope
 
 
 getTransformedDrawable : Body Data -> Scene3d.Entity WorldCoordinates
