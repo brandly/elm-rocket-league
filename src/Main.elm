@@ -108,14 +108,19 @@ defaultWheel =
 
 type alias Game =
     { world : World Data
-    , rockets : Bool
-    , steering : Float -- -1, 0, 1
-    , speeding : Float -- -1, 0, 1
-    , braking : Bool
+    , controls : Controls
     , boostTank : Float
     , focus : CameraFocus
     , lastTick : Float
     , refills : List Refill
+    }
+
+
+type alias Controls =
+    { rockets : Bool
+    , steering : Float -- -1, 0, 1
+    , speeding : Float -- -1, 0, 1
+    , braking : Bool
     }
 
 
@@ -243,6 +248,15 @@ update msg model =
     let
         keepPlaying g =
             { model | status = Playing g }
+
+        mapControls : (Controls -> Controls) -> Model
+        mapControls fn =
+            case model.status of
+                Playing g ->
+                    { model | status = Playing { g | controls = fn g.controls } }
+
+                _ ->
+                    model
     in
     case ( model.status, msg ) of
         ( _, Resize w h ) ->
@@ -252,6 +266,9 @@ update msg model =
 
         ( Playing game, Tick tick ) ->
             let
+                controls =
+                    game.controls
+
                 carPoint =
                     game.world
                         |> World.bodies
@@ -290,7 +307,7 @@ update msg model =
                     game.lastTick + tick
 
                 applyRockets boostTank =
-                    if game.rockets then
+                    if controls.rockets then
                         max 0 (boostTank - 0.5)
 
                     else
@@ -319,7 +336,7 @@ update msg model =
                         Car wheels ->
                             let
                                 boost =
-                                    if game.rockets && game.boostTank > 0 then
+                                    if controls.rockets && game.boostTank > 0 then
                                         Body.applyForce (Force.newtons 30000)
                                             (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
                                             (Body.originPoint body)
@@ -380,44 +397,48 @@ update msg model =
             , Cmd.none
             )
 
-        ( Playing game, KeyUp Jump ) ->
-            ( keepPlaying game, Cmd.none )
+        ( Playing _, KeyUp Jump ) ->
+            ( model, Cmd.none )
 
         ( Playing game, KeyDown Rocket ) ->
-            ( keepPlaying { game | rockets = True }, Cmd.none )
+            ( mapControls (\c -> { c | rockets = True }), Cmd.none )
 
         ( Playing game, KeyUp Rocket ) ->
-            ( keepPlaying { game | rockets = False }, Cmd.none )
+            ( mapControls (\c -> { c | rockets = False }), Cmd.none )
 
         ( Playing game, KeyDown (Steer k) ) ->
-            ( keepPlaying { game | steering = k }, Cmd.none )
+            ( mapControls (\c -> { c | steering = k }), Cmd.none )
 
         ( Playing game, KeyUp (Steer k) ) ->
-            ( keepPlaying
-                { game
-                    | steering =
-                        if k == game.steering then
-                            0
+            ( mapControls
+                (\c ->
+                    { c
+                        | steering =
+                            if k == c.steering then
+                                0
 
-                        else
-                            game.steering
-                }
+                            else
+                                c.steering
+                    }
+                )
             , Cmd.none
             )
 
         ( Playing game, KeyDown (Speed k) ) ->
-            ( keepPlaying { game | speeding = k }, Cmd.none )
+            ( mapControls (\c -> { c | speeding = k }), Cmd.none )
 
         ( Playing game, KeyUp (Speed k) ) ->
-            ( keepPlaying
-                { game
-                    | speeding =
-                        if k == game.speeding then
-                            0
+            ( mapControls
+                (\c ->
+                    { c
+                        | speeding =
+                            if k == c.speeding then
+                                0
 
-                        else
-                            game.speeding
-                }
+                            else
+                                c.speeding
+                    }
+                )
             , Cmd.none
             )
 
@@ -458,11 +479,14 @@ update msg model =
                         { world =
                             initialWorld
                                 |> World.add (floor texture)
+                                -- TODO: ceiling
                                 |> (\world -> List.foldl World.add world panels)
-                        , rockets = False
-                        , steering = 0
-                        , speeding = 0
-                        , braking = False
+                        , controls =
+                            { rockets = False
+                            , steering = 0
+                            , speeding = 0
+                            , braking = False
+                            }
                         , boostTank = boostSettings.initial
                         , focus = BallCam
                         , lastTick = 0
@@ -877,25 +901,25 @@ renderRefill active { point, size } =
 
 
 simulateCar : Duration -> Game -> List Wheel -> Body Data -> Body Data
-simulateCar dt { world, steering, braking, speeding } wheels car =
+simulateCar dt { world, controls } wheels car =
     case wheels of
         [ w1, w2, w3, w4 ] ->
             let
                 engineForce =
-                    Force.newtons (4000 * speeding)
+                    Force.newtons (4000 * controls.speeding)
 
                 brake =
-                    if braking then
+                    if controls.braking then
                         Force.newtons 4000
 
                     else
                         Quantity.zero
 
                 wheel1 =
-                    { w1 | steering = Angle.degrees (20 * steering), engineForce = engineForce, brake = brake }
+                    { w1 | steering = Angle.degrees (20 * controls.steering), engineForce = engineForce, brake = brake }
 
                 wheel2 =
-                    { w2 | steering = Angle.degrees (20 * steering), engineForce = engineForce, brake = brake }
+                    { w2 | steering = Angle.degrees (20 * controls.steering), engineForce = engineForce, brake = brake }
 
                 wheel3 =
                     { w3 | engineForce = engineForce, brake = brake }
