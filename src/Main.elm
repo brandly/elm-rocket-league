@@ -1484,9 +1484,22 @@ panels =
                 -- above goal
                 , buildPanel Top goalSize.width (roomSize.height - goalSize.height)
                     |> List.map (Body.translateBy (Vector3d.meters 0 0 goalSize.height))
-                , [ --back of goal
-                    buildPlane goalSize.width goalSize.height
-                        |> Body.translateBy (Vector3d.meters -15 0 (goalSize.height / 2))
+
+                -- back of goal
+                , buildPanel Both goalSize.width goalSize.height
+                    |> List.map (Body.translateBy (Vector3d.meters -goalSize.depth 0 0))
+                , [ --goal sides
+                    buildPlane goalSize.depth goalSize.height
+                        |> Body.translateBy (Vector3d.meters (-goalSize.width / 2) (goalSize.depth / 2) (goalSize.height / 2))
+                        |> Body.rotateAround Axis3d.z (Angle.degrees 90)
+                  , buildPlane goalSize.depth goalSize.height
+                        |> Body.translateBy (Vector3d.meters (-goalSize.width / 2) (-goalSize.depth / 2) (goalSize.height / 2))
+                        |> Body.rotateAround Axis3d.z (Angle.degrees -90)
+
+                  -- goal ceiling
+                  , buildPlane goalSize.width goalSize.depth
+                        |> Body.translateBy (Vector3d.meters -goalSize.height 0 (-goalSize.depth / 2))
+                        |> Body.rotateAround Axis3d.y (Angle.degrees 90)
                   ]
                 ]
 
@@ -1603,7 +1616,7 @@ buildPanel type_ width height =
         topSlope =
             bottomSlope
                 |> List.map (Body.rotateAround slopeAxis (Angle.degrees 180))
-                |> List.map (Body.translateBy (Vector3d.meters 0 0 (height - slopeRadius)))
+                |> List.map (Body.translateBy (Vector3d.meters 0 0 (height - (slopeRadius * 2))))
     in
     case type_ of
         Top ->
