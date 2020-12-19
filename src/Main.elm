@@ -23,7 +23,6 @@ import Luminance
 import Mass
 import Materials
 import Physics.Body as Body exposing (Body)
-import Physics.Constraint as Constraint exposing (Constraint)
 import Physics.Coordinates exposing (BodyCoordinates, WorldCoordinates)
 import Physics.Material
 import Physics.World as World exposing (World)
@@ -1661,34 +1660,3 @@ buildPanel type_ width height =
 getTransformedDrawable : Body Data -> Scene3d.Entity WorldCoordinates
 getTransformedDrawable body =
     Scene3d.placeIn (Body.frame body) (Body.data body).entity
-
-
-applySpeed : Float -> Frame3d Meters WorldCoordinates { defines : BodyCoordinates } -> Body Data -> Body Data
-applySpeed speed baseFrame body =
-    let
-        forward =
-            Frame3d.yDirection baseFrame
-
-        up =
-            Frame3d.zDirection baseFrame
-
-        wheelPoint =
-            Frame3d.originPoint (Body.frame body)
-
-        pointOnTheWheel =
-            wheelPoint
-                |> Point3d.translateBy
-                    (Vector3d.withLength wheelRadius up)
-
-        pointUnderTheWheel =
-            wheelPoint
-                |> Point3d.translateBy
-                    (Vector3d.withLength wheelRadius (Direction3d.reverse up))
-    in
-    body
-        |> Body.applyForce (Force.newtons (-speed * 10000))
-            forward
-            pointOnTheWheel
-        |> Body.applyForce (Force.newtons (-speed * 10000))
-            (Direction3d.reverse forward)
-            pointUnderTheWheel
