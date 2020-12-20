@@ -10,6 +10,7 @@ import Browser.Events as Events
 import Camera3d
 import Color exposing (Color)
 import Cylinder3d exposing (Cylinder3d)
+import Dict exposing (Dict)
 import Direction3d exposing (Direction3d)
 import Duration exposing (Duration)
 import Force exposing (Force)
@@ -535,35 +536,27 @@ subscriptions _ =
         ]
 
 
+controlDict : Dict String Command
+controlDict =
+    Dict.fromList
+        [ ( "ArrowLeft", Steer -1 )
+        , ( "ArrowRight", Steer 1 )
+        , ( "ArrowUp", Speed 1 )
+        , ( "ArrowDown", Speed -1 )
+        , ( " ", Jump )
+        , ( "Shift", Rocket )
+        , ( "c", ToggleCam )
+        ]
+
+
 keyDecoder : (Command -> Msg) -> Json.Decode.Decoder Msg
 keyDecoder toMsg =
     Json.Decode.field "key" Json.Decode.string
         |> Json.Decode.andThen
             (\string ->
-                case string of
-                    "ArrowLeft" ->
-                        Json.Decode.succeed (toMsg (Steer -1))
-
-                    "ArrowRight" ->
-                        Json.Decode.succeed (toMsg (Steer 1))
-
-                    "ArrowUp" ->
-                        Json.Decode.succeed (toMsg (Speed 1))
-
-                    "ArrowDown" ->
-                        Json.Decode.succeed (toMsg (Speed -1))
-
-                    " " ->
-                        Json.Decode.succeed (toMsg Jump)
-
-                    "Shift" ->
-                        Json.Decode.succeed (toMsg Rocket)
-
-                    "c" ->
-                        Json.Decode.succeed (toMsg ToggleCam)
-
-                    _ ->
-                        Json.Decode.fail ("Unrecognized key: " ++ string)
+                Dict.get string controlDict
+                    |> Maybe.map (toMsg >> Json.Decode.succeed)
+                    |> Maybe.withDefault (Json.Decode.fail ("Unrecognized key: " ++ string))
             )
 
 
