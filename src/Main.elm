@@ -34,7 +34,7 @@ import Scene3d
 import Scene3d.Light as Light
 import Scene3d.Material as Material
 import SketchPlane3d
-import Sphere3d exposing (Sphere3d)
+import Sphere3d
 import Task
 import Vector3d
 import Viewpoint3d
@@ -284,23 +284,7 @@ update msg model =
                 carPoint =
                     game.world
                         |> World.bodies
-                        |> List.filter
-                            (Body.data
-                                >> .id
-                                >> isCar
-                            )
-                        |> List.head
-                        |> Maybe.map Body.originPoint
-                        |> Maybe.withDefault (Point3d.meters 0 0 0)
-
-                ballPoint =
-                    game.world
-                        |> World.bodies
-                        |> List.filter
-                            (Body.data
-                                >> .id
-                                >> isBall
-                            )
+                        |> List.filter (Body.data >> .id >> isCar)
                         |> List.head
                         |> Maybe.map Body.originPoint
                         |> Maybe.withDefault (Point3d.meters 0 0 0)
@@ -415,16 +399,16 @@ update msg model =
         ( Playing _, KeyUp Jump ) ->
             ( model, Cmd.none )
 
-        ( Playing game, KeyDown Rocket ) ->
+        ( Playing _, KeyDown Rocket ) ->
             ( mapControls (\c -> { c | rockets = True }), Cmd.none )
 
-        ( Playing game, KeyUp Rocket ) ->
+        ( Playing _, KeyUp Rocket ) ->
             ( mapControls (\c -> { c | rockets = False }), Cmd.none )
 
-        ( Playing game, KeyDown (Steer k) ) ->
+        ( Playing _, KeyDown (Steer k) ) ->
             ( mapControls (\c -> { c | steering = k }), Cmd.none )
 
-        ( Playing game, KeyUp (Steer k) ) ->
+        ( Playing _, KeyUp (Steer k) ) ->
             ( mapControls
                 (\c ->
                     { c
@@ -439,10 +423,10 @@ update msg model =
             , Cmd.none
             )
 
-        ( Playing game, KeyDown (Speed k) ) ->
+        ( Playing _, KeyDown (Speed k) ) ->
             ( mapControls (\c -> { c | speeding = k }), Cmd.none )
 
-        ( Playing game, KeyUp (Speed k) ) ->
+        ( Playing _, KeyUp (Speed k) ) ->
             ( mapControls
                 (\c ->
                     { c
@@ -457,7 +441,7 @@ update msg model =
             , Cmd.none
             )
 
-        ( Playing game, KeyDown ToggleCam ) ->
+        ( Playing _, KeyDown ToggleCam ) ->
             ( mapPlayer
                 (\p ->
                     { p
@@ -472,7 +456,7 @@ update msg model =
             , Cmd.none
             )
 
-        ( Playing game, KeyUp ToggleCam ) ->
+        ( Playing _, KeyUp ToggleCam ) ->
             ( model, Cmd.none )
 
         ( Playing _, TextureResponse _ ) ->
@@ -638,7 +622,7 @@ viewGame { width, height } { world, player, refills, lastTick } =
                                     )
                             }
 
-                        ( ForwardCam, Just ball_, Just car_ ) ->
+                        ( ForwardCam, Just _, Just car_ ) ->
                             { -- Focus on a point meters above the car
                               focalPoint =
                                 frameOrigin car_
@@ -796,6 +780,7 @@ renderWheels car wheels =
         wheels
 
 
+wheelBody : Scene3d.Entity BodyCoordinates
 wheelBody =
     Scene3d.cylinderWithShadow (Material.uniform Materials.chromium) wheelShape
 
@@ -1440,10 +1425,6 @@ base =
         |> Body.moveTo offset
 
 
-wheelRadius =
-    Length.meters 0.8
-
-
 ball : Body Data
 ball =
     let
@@ -1460,11 +1441,6 @@ ball =
         |> Body.withMaterial (Physics.Material.custom { friction = 0.3, bounciness = 0.8 })
         |> Body.withBehavior (Body.dynamic (Mass.kilograms 1))
         |> Body.moveTo (Point3d.meters 0 0 2)
-
-
-floorSize : Length
-floorSize =
-    Length.meters 200
 
 
 floor : Material.Texture Color -> Body Data
@@ -1497,6 +1473,7 @@ floor texture =
         }
 
 
+roomSize : { width : Float, length : Float, height : Float }
 roomSize =
     { width = 131
     , length = 161
@@ -1586,6 +1563,7 @@ panels =
         ]
 
 
+buildPlane : Float -> Float -> Body Data
 buildPlane w h =
     let
         block =
