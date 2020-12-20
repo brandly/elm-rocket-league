@@ -107,11 +107,16 @@ defaultWheel =
 
 type alias Game =
     { world : World Data
-    , controls : Controls
-    , boostTank : Float
-    , focus : CameraFocus
+    , player : Player
     , lastTick : Float
     , refills : List Refill
+    }
+
+
+type alias Player =
+    { controls : Controls
+    , boostTank : Float
+    , focus : CameraFocus
     }
 
 
@@ -248,14 +253,18 @@ update msg model =
         keepPlaying g =
             { model | status = Playing g }
 
-        mapControls : (Controls -> Controls) -> Model
-        mapControls fn =
+        mapPlayer : (Player -> Player) -> Model
+        mapPlayer fn =
             case model.status of
                 Playing g ->
-                    { model | status = Playing { g | controls = fn g.controls } }
+                    { model | status = Playing { g | player = fn g.player } }
 
                 _ ->
                     model
+
+        mapControls : (Controls -> Controls) -> Model
+        mapControls fn =
+            mapPlayer (\p -> { p | controls = fn p.controls })
     in
     case ( model.status, msg ) of
         ( _, Resize w h ) ->
@@ -265,8 +274,11 @@ update msg model =
 
         ( Playing game, Tick tick ) ->
             let
+                player =
+                    game.player
+
                 controls =
-                    game.controls
+                    player.controls
 
                 carPoint =
                     game.world
@@ -293,7 +305,7 @@ update msg model =
                         |> Maybe.withDefault (Point3d.meters 0 0 0)
 
                 fullTank =
-                    game.boostTank >= boostSettings.max
+                    player.boostTank >= boostSettings.max
 
                 carHits : Refill -> Bool
                 carHits { point, time } =
@@ -335,7 +347,7 @@ update msg model =
                         Car wheels ->
                             let
                                 boost =
-                                    if controls.rockets && game.boostTank > 0 then
+                                    if controls.rockets && player.boostTank > 0 then
                                         Body.applyForce (Force.newtons 30000)
                                             (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
                                             (Body.originPoint body)
@@ -355,10 +367,13 @@ update msg model =
                         game.world
                             |> World.update bodyUpdate
                             |> World.simulate (Duration.seconds (tick / 1000))
-                    , boostTank =
-                        game.boostTank
-                            |> applyRefills
-                            |> applyRockets
+                    , player =
+                        { player
+                            | boostTank =
+                                player.boostTank
+                                    |> applyRefills
+                                    |> applyRockets
+                        }
                     , lastTick = currentTick
                     , refills =
                         game.refills
@@ -442,15 +457,17 @@ update msg model =
             )
 
         ( Playing game, KeyDown ToggleCam ) ->
-            ( keepPlaying
-                { game
-                    | focus =
-                        if game.focus == BallCam then
-                            ForwardCam
+            ( mapPlayer
+                (\p ->
+                    { p
+                        | focus =
+                            if p.focus == BallCam then
+                                ForwardCam
 
-                        else
-                            BallCam
-                }
+                            else
+                                BallCam
+                    }
+                )
             , Cmd.none
             )
 
@@ -461,17 +478,6 @@ update msg model =
             ( model, Cmd.none )
 
         ( Loading, TextureResponse (Ok texture) ) ->
-            let
-                measure =
-                    roomSize.length / 10.8
-
-                refillRing x y =
-                    [ ( -measure * x, measure * y )
-                    , ( -measure * x, -measure * y )
-                    , ( measure * x, measure * y )
-                    , ( measure * x, -measure * y )
-                    ]
-            in
             ( { model
                 | status =
                     Playing
@@ -480,62 +486,18 @@ update msg model =
                                 |> World.add (floor texture)
                                 -- TODO: ceiling
                                 |> (\world -> List.foldl World.add world panels)
-                        , controls =
-                            { rockets = False
-                            , steering = 0
-                            , speeding = 0
-                            , braking = False
+                        , player =
+                            { controls =
+                                { rockets = False
+                                , steering = 0
+                                , speeding = 0
+                                , braking = False
+                                }
+                            , boostTank = boostSettings.initial
+                            , focus = BallCam
                             }
-                        , boostTank = boostSettings.initial
-                        , focus = BallCam
                         , lastTick = 0
-                        , refills =
-                            List.concat
-                                [ -- four surrounding center
-                                  List.concat
-                                    [ [ ( measure, 0 )
-                                      , ( -measure, 0 )
-                                      , ( 0, measure )
-                                      , ( 0, -measure )
-
-                                      -- center line
-                                      , ( measure * 2.7, 0 )
-                                      , ( -measure * 2.7, 0 )
-                                      , ( measure * 4.1, 0 )
-                                      , ( -measure * 4.1, 0 )
-                                      ]
-                                    , --
-                                      refillRing 4.05 1.75
-                                    , refillRing 3.2 0.9
-                                    , refillRing 2.2 1.75
-                                    , refillRing 2.4 3.4
-                                    , refillRing 1 2
-                                    ]
-                                    |> List.map
-                                        (\( x, y ) ->
-                                            { point = Point3d.meters x y 0
-                                            , time = -boostSettings.reloadTime
-                                            , size = SmallRefill
-                                            }
-                                        )
-                                , [ -- center sideline
-                                    ( 0, measure * 3.6 )
-                                  , ( 0, -measure * 3.6 )
-                                  , --
-                                    ( -measure * 4, measure * 3 )
-                                  , ( -measure * 4, -measure * 3 )
-                                  , --
-                                    ( measure * 4, measure * 3 )
-                                  , ( measure * 4, -measure * 3 )
-                                  ]
-                                    |> List.map
-                                        (\( x, y ) ->
-                                            { point = Point3d.meters x y 0
-                                            , time = -boostSettings.reloadTime
-                                            , size = FullRefill
-                                            }
-                                        )
-                                ]
+                        , refills = initialRefills
                         }
               }
             , Cmd.none
@@ -625,7 +587,7 @@ view model =
 
 
 viewGame : ScreenSize -> Game -> List (Html Msg)
-viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
+viewGame { width, height } { world, player, refills, lastTick } =
     let
         car =
             world
@@ -659,7 +621,7 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
                     Point3d.meters 0 0 0
 
                 { focalPoint, azimuth, distance, elevation } =
-                    case ( focus, ballBody, car ) of
+                    case ( player.focus, ballBody, car ) of
                         ( BallCam, Just ball_, Just car_ ) ->
                             { -- Focus on the ball
                               focalPoint = frameOrigin ball_
@@ -804,7 +766,7 @@ viewGame { width, height } { world, refills, boostTank, focus, lastTick } =
             [ Html.Attributes.style "font-size" "48px"
             , Html.Attributes.style "margin" "0"
             ]
-            [ Html.text (String.fromInt (round boostTank)) ]
+            [ Html.text (String.fromInt (round player.boostTank)) ]
         , Html.p [ Html.Attributes.style "margin" "0" ]
             [ Html.text "BOOST" ]
         ]
@@ -865,6 +827,67 @@ initialWorld =
         |> World.add ball
 
 
+initialRefills : List Refill
+initialRefills =
+    let
+        measure =
+            roomSize.length / 10.8
+
+        refillRing x y =
+            [ ( -measure * x, measure * y )
+            , ( -measure * x, -measure * y )
+            , ( measure * x, measure * y )
+            , ( measure * x, -measure * y )
+            ]
+    in
+    List.concat
+        [ -- four surrounding center
+          List.concat
+            [ [ ( measure, 0 )
+              , ( -measure, 0 )
+              , ( 0, measure )
+              , ( 0, -measure )
+
+              -- center line
+              , ( measure * 2.7, 0 )
+              , ( -measure * 2.7, 0 )
+              , ( measure * 4.1, 0 )
+              , ( -measure * 4.1, 0 )
+              ]
+            , --
+              refillRing 4.05 1.75
+            , refillRing 3.2 0.9
+            , refillRing 2.2 1.75
+            , refillRing 2.4 3.4
+            , refillRing 1 2
+            ]
+            |> List.map
+                (\( x, y ) ->
+                    { point = Point3d.meters x y 0
+                    , time = -boostSettings.reloadTime
+                    , size = SmallRefill
+                    }
+                )
+        , [ -- center sideline
+            ( 0, measure * 3.6 )
+          , ( 0, -measure * 3.6 )
+          , --
+            ( -measure * 4, measure * 3 )
+          , ( -measure * 4, -measure * 3 )
+          , --
+            ( measure * 4, measure * 3 )
+          , ( measure * 4, -measure * 3 )
+          ]
+            |> List.map
+                (\( x, y ) ->
+                    { point = Point3d.meters x y 0
+                    , time = -boostSettings.reloadTime
+                    , size = FullRefill
+                    }
+                )
+        ]
+
+
 renderRefill : Bool -> Refill -> Scene3d.Entity WorldCoordinates
 renderRefill active { point, size } =
     let
@@ -900,10 +923,13 @@ renderRefill active { point, size } =
 
 
 simulateCar : Duration -> Game -> List Wheel -> Body Data -> Body Data
-simulateCar dt { world, controls } wheels car =
+simulateCar dt { world, player } wheels car =
     case wheels of
         [ w1, w2, w3, w4 ] ->
             let
+                { controls } =
+                    player
+
                 engineForce =
                     Force.newtons (4000 * controls.speeding)
 
