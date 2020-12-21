@@ -22,10 +22,7 @@ jobs:
             elm-stuff
           key: ${{ runner.os }}-cache
 
-      - run: npm install
-
-      - run: |
-          npm run production
+      - run: make production
 
       - uses: josephbmanley/butler-publish-itchio-action@master
         env:

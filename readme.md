@@ -2,8 +2,15 @@
 
 ### development
 
+build everything into dist:
+
 ```
-$ npm install
-$ npm start
-$ open http://localhost:8000/src/Main.elm
+$ make
+```
+
+you'll want some server to deliver static assets:
+
+```
+$ python -m SimpleHTTPServer
+$ open http://localhost:8000/dist/
 ```
