@@ -119,7 +119,7 @@ type alias Game =
 type Status
     = Preparing
     | Live
-    | Paused
+    | Paused Status
     | Replay
 
 
@@ -175,6 +175,7 @@ type Command
     | Steer Float
     | Speed Float
     | ToggleCam
+    | TogglePause
 
 
 type alias CarSettings =
@@ -339,7 +340,7 @@ update msg model =
                                     else
                                         identity
                             in
-                            simulateCar (Duration.milliseconds tick) game wheels body
+                            simulateCar (Duration.milliseconds tick) game.world controls wheels body
                                 |> boost
 
                         _ ->
@@ -404,6 +405,14 @@ update msg model =
                     , Cmd.none
                     )
 
+                TogglePause ->
+                    case game.status of
+                        Paused status ->
+                            ( keepPlaying { game | status = status }, Cmd.none )
+
+                        _ ->
+                            ( keepPlaying { game | status = Paused game.status }, Cmd.none )
+
         ( Playing game, KeyUp cmd ) ->
             case cmd of
                 Jump ->
@@ -435,6 +444,9 @@ update msg model =
                     ( mapControls (\c -> { c | speeding = speeding c }), Cmd.none )
 
                 ToggleCam ->
+                    ( model, Cmd.none )
+
+                TogglePause ->
                     ( model, Cmd.none )
 
         ( Playing _, TextureResponse _ ) ->
@@ -515,13 +527,27 @@ applyJump body =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.batch
-        [ Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
-        , Events.onAnimationFrameDelta Tick
-        , Events.onKeyDown (keyDecoder KeyDown)
-        , Events.onKeyUp (keyDecoder KeyUp)
-        ]
+subscriptions { screen } =
+    case screen of
+        Playing game ->
+            case game.status of
+                Paused _ ->
+                    Sub.batch
+                        [ Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
+                        , Events.onKeyDown (keyDecoder KeyDown)
+                        , Events.onKeyUp (keyDecoder KeyUp)
+                        ]
+
+                _ ->
+                    Sub.batch
+                        [ Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
+                        , Events.onAnimationFrameDelta Tick
+                        , Events.onKeyDown (keyDecoder KeyDown)
+                        , Events.onKeyUp (keyDecoder KeyUp)
+                        ]
+
+        _ ->
+            Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
 
 
 controlDict : Dict String Command
@@ -534,6 +560,7 @@ controlDict =
         , ( " ", Jump )
         , ( "Shift", Rocket )
         , ( "c", ToggleCam )
+        , ( "p", TogglePause )
         ]
 
 
@@ -801,14 +828,11 @@ initialWorld =
         |> World.add ball
 
 
-simulateCar : Duration -> Game -> List Wheel -> Body Data -> Body Data
-simulateCar dt { world, player } wheels car =
+simulateCar : Duration -> World Data -> Controls -> List Wheel -> Body Data -> Body Data
+simulateCar dt world controls wheels car =
     case wheels of
         [ w1, w2, w3, w4 ] ->
             let
-                { controls } =
-                    player
-
                 engineForce =
                     Force.newtons (4000 * controls.speeding)
 
