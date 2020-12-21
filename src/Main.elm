@@ -112,7 +112,15 @@ type alias Game =
     , player : Player
     , lastTick : Float
     , refills : List Refill
+    , status : Status
     }
+
+
+type Status
+    = Preparing
+    | Live
+    | Paused
+    | Replay
 
 
 type alias Player =
@@ -138,8 +146,19 @@ boostSettings =
     }
 
 
+refillIsActive : Float -> Refill -> Bool
 refillIsActive =
     Refill.isActive boostSettings.reloadTime
+
+
+refillSize : Refill -> Float
+refillSize refill =
+    case refill.size of
+        FullRefill ->
+            boostSettings.max
+
+        SmallRefill ->
+            boostSettings.refill
 
 
 type Msg
@@ -302,15 +321,7 @@ update msg model =
                         adding =
                             game.refills
                                 |> List.filter carHits
-                                |> List.map
-                                    (\refill ->
-                                        case refill.size of
-                                            FullRefill ->
-                                                boostSettings.max
-
-                                            SmallRefill ->
-                                                boostSettings.refill
-                                    )
+                                |> List.map refillSize
                                 |> List.sum
                     in
                     min boostSettings.max (adding + boostTank)
@@ -362,120 +373,76 @@ update msg model =
             , Cmd.none
             )
 
-        ( Playing game, KeyDown Jump ) ->
-            ( keepPlaying
-                { game
-                    | world =
-                        World.update
-                            (\body ->
-                                case (Body.data body).id of
-                                    Car _ ->
-                                        body
-                                            |> Body.applyForce (Force.newtons 400000)
-                                                -- TODO: add direction modifier keys
-                                                (body |> Body.frame >> Frame3d.zDirection)
-                                                (Body.originPoint body)
+        ( Playing game, KeyDown cmd ) ->
+            case cmd of
+                Jump ->
+                    ( keepPlaying { game | world = World.update applyJump game.world }
+                    , Cmd.none
+                    )
 
-                                    _ ->
-                                        body
-                            )
-                            game.world
-                }
-            , Cmd.none
-            )
+                Rocket ->
+                    ( mapControls (\c -> { c | rockets = True }), Cmd.none )
 
-        ( Playing _, KeyUp Jump ) ->
-            ( model, Cmd.none )
+                Steer k ->
+                    ( mapControls (\c -> { c | steering = k }), Cmd.none )
 
-        ( Playing _, KeyDown Rocket ) ->
-            ( mapControls (\c -> { c | rockets = True }), Cmd.none )
+                Speed k ->
+                    ( mapControls (\c -> { c | speeding = k }), Cmd.none )
 
-        ( Playing _, KeyUp Rocket ) ->
-            ( mapControls (\c -> { c | rockets = False }), Cmd.none )
+                ToggleCam ->
+                    ( mapPlayer
+                        (\p ->
+                            { p
+                                | focus =
+                                    if p.focus == BallCam then
+                                        ForwardCam
 
-        ( Playing _, KeyDown (Steer k) ) ->
-            ( mapControls (\c -> { c | steering = k }), Cmd.none )
+                                    else
+                                        BallCam
+                            }
+                        )
+                    , Cmd.none
+                    )
 
-        ( Playing _, KeyUp (Steer k) ) ->
-            ( mapControls
-                (\c ->
-                    { c
-                        | steering =
+        ( Playing game, KeyUp cmd ) ->
+            case cmd of
+                Jump ->
+                    ( model, Cmd.none )
+
+                Rocket ->
+                    ( mapControls (\c -> { c | rockets = False }), Cmd.none )
+
+                Steer k ->
+                    let
+                        steering c =
                             if k == c.steering then
                                 0
 
                             else
                                 c.steering
-                    }
-                )
-            , Cmd.none
-            )
+                    in
+                    ( mapControls (\c -> { c | steering = steering c }), Cmd.none )
 
-        ( Playing _, KeyDown (Speed k) ) ->
-            ( mapControls (\c -> { c | speeding = k }), Cmd.none )
-
-        ( Playing _, KeyUp (Speed k) ) ->
-            ( mapControls
-                (\c ->
-                    { c
-                        | speeding =
+                Speed k ->
+                    let
+                        speeding c =
                             if k == c.speeding then
                                 0
 
                             else
                                 c.speeding
-                    }
-                )
-            , Cmd.none
-            )
+                    in
+                    ( mapControls (\c -> { c | speeding = speeding c }), Cmd.none )
 
-        ( Playing _, KeyDown ToggleCam ) ->
-            ( mapPlayer
-                (\p ->
-                    { p
-                        | focus =
-                            if p.focus == BallCam then
-                                ForwardCam
-
-                            else
-                                BallCam
-                    }
-                )
-            , Cmd.none
-            )
-
-        ( Playing _, KeyUp ToggleCam ) ->
-            ( model, Cmd.none )
+                ToggleCam ->
+                    ( model, Cmd.none )
 
         ( Playing _, TextureResponse _ ) ->
             ( model, Cmd.none )
 
         ( Loading, TextureResponse (Ok texture) ) ->
             ( { model
-                | screen =
-                    Playing
-                        { world =
-                            initialWorld
-                                |> World.add (floor texture)
-                                |> World.add ceiling
-                                |> (\world -> List.foldl World.add world panels)
-                        , player =
-                            { controls =
-                                { rockets = False
-                                , steering = 0
-                                , speeding = 0
-                                , braking = False
-                                }
-                            , boostTank = boostSettings.initial
-                            , focus = BallCam
-                            }
-                        , lastTick = 0
-                        , refills =
-                            Refill.init
-                                { startTime = -boostSettings.reloadTime
-                                , measure = roomSize.length / 10.8
-                                }
-                        }
+                | screen = initGameScreen texture
               }
             , Cmd.none
             )
@@ -500,6 +467,51 @@ update msg model =
 
         ( LoadingError _, _ ) ->
             ( model, Cmd.none )
+
+
+initGameScreen : Material.Texture Color -> Screen
+initGameScreen texture =
+    Playing
+        { world =
+            initialWorld
+                |> World.add (floor texture)
+                |> World.add ceiling
+                |> (\world -> List.foldl World.add world panels)
+        , player =
+            { controls =
+                { rockets = False
+                , steering = 0
+                , speeding = 0
+                , braking = False
+                }
+            , boostTank = boostSettings.initial
+            , focus = BallCam
+            }
+        , lastTick = 0
+        , refills =
+            Refill.init
+                { startTime = -boostSettings.reloadTime
+                , measure = roomSize.length / 10.8
+                }
+        , status = Preparing
+        }
+
+
+applyJump : Body Data -> Body Data
+applyJump body =
+    -- TODO: restrict to double jump
+    -- TODO: raycast to see if on ground
+    -- TODO: handle arrow directions
+    case (Body.data body).id of
+        Car _ ->
+            body
+                |> Body.applyForce (Force.newtons 400000)
+                    -- TODO: add direction modifier keys
+                    (body |> Body.frame >> Frame3d.zDirection)
+                    (Body.originPoint body)
+
+        _ ->
+            body
 
 
 subscriptions : Model -> Sub Msg
