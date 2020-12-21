@@ -307,6 +307,14 @@ update msg model =
                         && (Point3d.distanceFrom carPoint point |> Length.inMeters)
                         < 2.5
 
+                applyCarHit : Refill -> Refill
+                applyCarHit refill =
+                    if refillIsActive currentTick refill && carHits refill then
+                        { refill | time = currentTick }
+
+                    else
+                        refill
+
                 currentTick =
                     game.lastTick + tick
 
@@ -360,16 +368,7 @@ update msg model =
                                     |> applyRockets
                         }
                     , lastTick = currentTick
-                    , refills =
-                        game.refills
-                            |> List.map
-                                (\refill ->
-                                    if refillIsActive currentTick refill && carHits refill then
-                                        { refill | time = currentTick }
-
-                                    else
-                                        refill
-                                )
+                    , refills = game.refills |> List.map applyCarHit
                 }
             , Cmd.none
             )
