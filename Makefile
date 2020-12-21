@@ -19,9 +19,9 @@ dist/elm.js: $(shell find src -type f) package.json elm.json node_modules/
 dist/index.html: src/index.html
 	cp src/index.html dist/
 
-dist/static:
+dist/static: dist/ $(shell find src/static -type f)
 	mkdir -p dist/static
-	cp src/static/* dist/static
+	rsync -rupE src/static dist/
 
 production: all
 	$(elm) make src/Main.elm --output dist/elm.js --optimize
