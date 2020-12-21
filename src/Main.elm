@@ -569,11 +569,7 @@ viewGame { width, height } { world, player, refills, lastTick } =
         car =
             world
                 |> World.bodies
-                |> List.filter
-                    (Body.data
-                        >> .id
-                        >> isCar
-                    )
+                |> List.filter (Body.data >> .id >> isCar)
                 |> List.head
 
         camera =
@@ -581,11 +577,7 @@ viewGame { width, height } { world, player, refills, lastTick } =
                 ballBody =
                     world
                         |> World.bodies
-                        |> List.filter
-                            (Body.data
-                                >> .id
-                                >> isBall
-                            )
+                        |> List.filter (Body.data >> .id >> isBall)
                         |> List.head
 
                 frameOrigin =
