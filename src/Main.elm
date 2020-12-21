@@ -457,7 +457,7 @@ update msg model =
                         { world =
                             initialWorld
                                 |> World.add (floor texture)
-                                -- TODO: ceiling
+                                |> World.add ceiling
                                 |> (\world -> List.foldl World.add world panels)
                         , player =
                             { controls =
@@ -1360,6 +1360,28 @@ floor texture =
                 (point half half)
                 (point half -half)
         }
+
+
+ceiling : Body Data
+ceiling =
+    let
+        point x y =
+            Point3d.meters x y 0
+
+        half =
+            roomSize.length / 2
+    in
+    Body.plane
+        { id = Obstacle
+        , entity =
+            Scene3d.quad (Material.uniform Materials.chromium)
+                (point -half -half)
+                (point -half half)
+                (point half half)
+                (point half -half)
+        }
+        |> Body.rotateAround Axis3d.x (Angle.degrees 180)
+        |> Body.translateBy (Vector3d.meters 0 0 roomSize.height)
 
 
 roomSize : { width : Float, length : Float, height : Float }
