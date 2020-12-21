@@ -17,6 +17,7 @@ import Force exposing (Force)
 import Frame3d exposing (Frame3d)
 import Html exposing (Html)
 import Html.Attributes
+import Html.Events
 import Illuminance
 import Json.Decode
 import Length exposing (Length, Meters, inMeters, meters)
@@ -164,6 +165,7 @@ refillSize refill =
 type Msg
     = Tick Float
     | Resize Float Float
+    | StartGame
     | KeyDown Command
     | KeyUp Command
     | TextureResponse (Result WebGL.Texture.Error (Material.Texture Color))
@@ -240,6 +242,7 @@ type alias Model =
 type Screen
     = Loading
     | LoadingError String
+    | Menu (Material.Texture Color)
     | Playing Game
 
 
@@ -281,95 +284,15 @@ update msg model =
             , Cmd.none
             )
 
+        ( Menu texture, StartGame ) ->
+            ( { model | screen = initGameScreen texture }, Cmd.none )
+
+        ( Menu _, _ ) ->
+            ( model, Cmd.none )
+
         ( Playing game, Tick tick ) ->
-            let
-                player =
-                    game.player
-
-                controls =
-                    player.controls
-
-                carPoint =
-                    game.world
-                        |> World.bodies
-                        |> List.filter (Body.data >> .id >> isCar)
-                        |> List.head
-                        |> Maybe.map Body.originPoint
-                        |> Maybe.withDefault (Point3d.meters 0 0 0)
-
-                fullTank =
-                    player.boostTank >= boostSettings.max
-
-                carHits : Refill -> Bool
-                carHits { point, time } =
-                    not fullTank
-                        && ((currentTick - time) > boostSettings.reloadTime)
-                        && (Point3d.distanceFrom carPoint point |> Length.inMeters)
-                        < 2.5
-
-                applyCarHit : Refill -> Refill
-                applyCarHit refill =
-                    if refillIsActive currentTick refill && carHits refill then
-                        { refill | time = currentTick }
-
-                    else
-                        refill
-
-                currentTick =
-                    game.lastTick + tick
-
-                applyRockets boostTank =
-                    if controls.rockets then
-                        max 0 (boostTank - 0.5)
-
-                    else
-                        boostTank
-
-                applyRefills boostTank =
-                    let
-                        adding =
-                            game.refills
-                                |> List.filter carHits
-                                |> List.map refillSize
-                                |> List.sum
-                    in
-                    min boostSettings.max (adding + boostTank)
-
-                bodyUpdate body =
-                    case (Body.data body).id of
-                        Car wheels ->
-                            let
-                                boost =
-                                    if controls.rockets && player.boostTank > 0 then
-                                        Body.applyForce (Force.newtons 30000)
-                                            (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
-                                            (Body.originPoint body)
-
-                                    else
-                                        identity
-                            in
-                            simulateCar (Duration.milliseconds tick) game.world controls wheels body
-                                |> boost
-
-                        _ ->
-                            body
-            in
-            ( keepPlaying
-                { game
-                    | world =
-                        game.world
-                            |> World.update bodyUpdate
-                            |> World.simulate (Duration.seconds (tick / 1000))
-                    , player =
-                        { player
-                            | boostTank =
-                                player.boostTank
-                                    |> applyRefills
-                                    |> applyRockets
-                        }
-                    , lastTick = currentTick
-                    , refills = game.refills |> List.map applyCarHit
-                }
+            ( updateGame game tick
+                |> keepPlaying
             , Cmd.none
             )
 
@@ -451,12 +374,11 @@ update msg model =
         ( Playing _, TextureResponse _ ) ->
             ( model, Cmd.none )
 
+        ( Playing _, StartGame ) ->
+            ( model, Cmd.none )
+
         ( Loading, TextureResponse (Ok texture) ) ->
-            ( { model
-                | screen = initGameScreen texture
-              }
-            , Cmd.none
-            )
+            ( { model | screen = Menu texture }, Cmd.none )
 
         ( Loading, TextureResponse (Err err) ) ->
             ( { model
@@ -480,14 +402,123 @@ update msg model =
             ( model, Cmd.none )
 
 
+updateGame : Game -> Float -> Game
+updateGame game tick =
+    let
+        currentTick =
+            game.lastTick + tick
+    in
+    case game.status of
+        Paused _ ->
+            game
+
+        Replay ->
+            game
+
+        Preparing ->
+            if currentTick > 2000 then
+                { game
+                    | status = Live
+                    , world = World.add base game.world
+                    , lastTick = currentTick
+                }
+
+            else
+                { game | lastTick = currentTick }
+
+        Live ->
+            let
+                player =
+                    game.player
+
+                controls =
+                    player.controls
+
+                carPoint =
+                    game.world
+                        |> World.bodies
+                        |> List.filter (Body.data >> .id >> isCar)
+                        |> List.head
+                        |> Maybe.map Body.originPoint
+                        |> Maybe.withDefault (Point3d.meters 0 0 0)
+
+                fullTank =
+                    player.boostTank >= boostSettings.max
+
+                carHits : Refill -> Bool
+                carHits { point, time } =
+                    not fullTank
+                        && ((currentTick - time) > boostSettings.reloadTime)
+                        && (Point3d.distanceFrom carPoint point |> Length.inMeters)
+                        < 2.5
+
+                applyCarHit : Refill -> Refill
+                applyCarHit refill =
+                    if refillIsActive currentTick refill && carHits refill then
+                        { refill | time = currentTick }
+
+                    else
+                        refill
+
+                applyRockets boostTank =
+                    if controls.rockets then
+                        max 0 (boostTank - 0.5)
+
+                    else
+                        boostTank
+
+                applyRefills boostTank =
+                    let
+                        adding =
+                            game.refills
+                                |> List.filter carHits
+                                |> List.map refillSize
+                                |> List.sum
+                    in
+                    min boostSettings.max (adding + boostTank)
+
+                bodyUpdate body =
+                    case (Body.data body).id of
+                        Car wheels ->
+                            let
+                                boost =
+                                    if controls.rockets && player.boostTank > 0 then
+                                        Body.applyForce (Force.newtons 30000)
+                                            (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
+                                            (Body.originPoint body)
+
+                                    else
+                                        identity
+                            in
+                            simulateCar (Duration.milliseconds tick) game.world controls wheels body
+                                |> boost
+
+                        _ ->
+                            body
+            in
+            { game
+                | world =
+                    game.world
+                        |> World.update bodyUpdate
+                        |> World.simulate (Duration.seconds (tick / 1000))
+                , player =
+                    { player
+                        | boostTank =
+                            player.boostTank
+                                |> applyRefills
+                                |> applyRockets
+                    }
+                , lastTick = currentTick
+                , refills = game.refills |> List.map applyCarHit
+            }
+
+
 initGameScreen : Material.Texture Color -> Screen
 initGameScreen texture =
     Playing
         { world =
             initialWorld
                 |> World.add (floor texture)
-                |> World.add ceiling
-                |> (\world -> List.foldl World.add world panels)
         , player =
             { controls =
                 { rockets = False
@@ -579,7 +610,14 @@ view model =
     Html.div [ Html.Attributes.class "container" ]
         (case model.screen of
             Loading ->
-                [ Html.p [] [ Html.text "Loading........" ] ]
+                [ Html.p [ Html.Attributes.class "center-popup" ] [ Html.text "Loading..." ] ]
+
+            Menu _ ->
+                [ Html.p [ Html.Attributes.class "center-popup" ]
+                    [ Html.h1 [] [ Html.text "Rocket League" ]
+                    , Html.button [ Html.Events.onClick StartGame ] [ Html.text "Start" ]
+                    ]
+                ]
 
             Playing game ->
                 viewGame model.screenSize game
@@ -610,10 +648,10 @@ viewGame { width, height } { world, player, refills, lastTick } =
                     Body.frame >> Frame3d.originPoint
 
                 defaultAngle =
-                    Angle.degrees 180
+                    Angle.degrees 0
 
                 defaultPoint =
-                    Point3d.meters 0 0 0
+                    Point3d.meters 30 0 10
 
                 { focalPoint, azimuth, distance, elevation } =
                     case ( player.focus, ballBody, car ) of
@@ -802,7 +840,8 @@ initialWorld =
     in
     World.empty
         |> World.withGravity earthGravity Direction3d.negativeZ
-        |> World.add base
+        |> (\world -> List.foldl World.add world panels)
+        |> World.add ceiling
         |> World.add ball
 
 
