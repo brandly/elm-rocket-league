@@ -735,13 +735,13 @@ viewGame { width, height } { world, player, refills, lastTick } =
         , clipDepth = meters 0.1
         , entities = drawables
         }
-    , Html.div [ Html.Attributes.class "hud-bottom-left" ]
+    , Html.div [ Html.Attributes.class "hud-pane hud-bottom-left" ]
         [ Html.p [] [ Html.text "Drive - Arrow keys" ]
         , Html.p [] [ Html.text "Boost - Shift" ]
         , Html.p [] [ Html.text "Toggle Camera - C" ]
         , Html.p [] [ Html.text "Jump (buggy) - Spacebar" ]
         ]
-    , Html.div [ Html.Attributes.class "hud-bottom-right" ]
+    , Html.div [ Html.Attributes.class "hud-pane hud-bottom-right" ]
         [ Html.p
             [ Html.Attributes.style "font-size" "48px" ]
             [ Html.text (String.fromInt (round player.boostTank)) ]

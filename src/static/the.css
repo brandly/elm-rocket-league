@@ -3,7 +3,7 @@ body {
 }
 
 p {
-  margin: 0;
+  margin: 4px 0;
 }
 
 .container {
@@ -12,13 +12,16 @@ p {
   top: 0;
 }
 
+.hud-pane {
+  padding: 6px 12px;
+  border-radius: 4px;
+  background-color: rgba(255,255,255, 0.5);
+}
+
 .hud-bottom-left {
   position: fixed;
   bottom: 12px;
   left: 24px;
-  padding: 0 12px;
-  border-radius: 4px;
-  background-color: rgba(255,255,255, 0.5);
 }
 
 .hud-bottom-right {
@@ -26,7 +29,4 @@ p {
   bottom: 12px;
   right: 24px;
   text-align: right;
-  padding: 6px 12px;
-  border-radius: 4px;
-  background-color: rgba(255,255,255, 0.5);
 }
