@@ -30,6 +30,7 @@ import Physics.World as World exposing (World)
 import Pixels exposing (pixels)
 import Point3d exposing (Point3d)
 import Quantity exposing (Quantity(..))
+import Refill exposing (Refill, Size(..))
 import Scene3d
 import Scene3d.Light as Light
 import Scene3d.Material as Material
@@ -129,29 +130,16 @@ type alias Controls =
     }
 
 
-type alias Refill =
-    { point : Point3d Meters WorldCoordinates
-    , time : Float
-    , size : RefillSize
-    }
-
-
-type RefillSize
-    = FullRefill
-    | SmallRefill
-
-
-refillIsActive : Float -> Refill -> Bool
-refillIsActive currentTime { time } =
-    (currentTime - time) > boostSettings.reloadTime
-
-
 boostSettings =
     { reloadTime = 10000
     , initial = 45
     , max = 100
     , refill = 12
     }
+
+
+refillIsActive =
+    Refill.isActive boostSettings.reloadTime
 
 
 type Msg
@@ -482,7 +470,11 @@ update msg model =
                             , focus = BallCam
                             }
                         , lastTick = 0
-                        , refills = initialRefills
+                        , refills =
+                            Refill.init
+                                { startTime = -boostSettings.reloadTime
+                                , measure = roomSize.length / 10.8
+                                }
                         }
               }
             , Cmd.none
@@ -678,7 +670,7 @@ viewGame { width, height } { world, player, refills, lastTick } =
                         []
                 , List.map
                     (\refill ->
-                        renderRefill (refillIsActive lastTick refill) refill
+                        Refill.view (refillIsActive lastTick refill) refill
                     )
                     refills
                 ]
@@ -795,101 +787,6 @@ initialWorld =
         |> World.withGravity earthGravity Direction3d.negativeZ
         |> World.add base
         |> World.add ball
-
-
-initialRefills : List Refill
-initialRefills =
-    let
-        measure =
-            roomSize.length / 10.8
-
-        refillRing x y =
-            [ ( -measure * x, measure * y )
-            , ( -measure * x, -measure * y )
-            , ( measure * x, measure * y )
-            , ( measure * x, -measure * y )
-            ]
-    in
-    List.concat
-        [ -- four surrounding center
-          List.concat
-            [ [ ( measure, 0 )
-              , ( -measure, 0 )
-              , ( 0, measure )
-              , ( 0, -measure )
-
-              -- center line
-              , ( measure * 2.7, 0 )
-              , ( -measure * 2.7, 0 )
-              , ( measure * 4.1, 0 )
-              , ( -measure * 4.1, 0 )
-              ]
-            , --
-              refillRing 4.05 1.75
-            , refillRing 3.2 0.9
-            , refillRing 2.2 1.75
-            , refillRing 2.4 3.4
-            , refillRing 1 2
-            ]
-            |> List.map
-                (\( x, y ) ->
-                    { point = Point3d.meters x y 0
-                    , time = -boostSettings.reloadTime
-                    , size = SmallRefill
-                    }
-                )
-        , [ -- center sideline
-            ( 0, measure * 3.6 )
-          , ( 0, -measure * 3.6 )
-          , --
-            ( -measure * 4, measure * 3 )
-          , ( -measure * 4, -measure * 3 )
-          , --
-            ( measure * 4, measure * 3 )
-          , ( measure * 4, -measure * 3 )
-          ]
-            |> List.map
-                (\( x, y ) ->
-                    { point = Point3d.meters x y 0
-                    , time = -boostSettings.reloadTime
-                    , size = FullRefill
-                    }
-                )
-        ]
-
-
-renderRefill : Bool -> Refill -> Scene3d.Entity WorldCoordinates
-renderRefill active { point, size } =
-    let
-        shape =
-            Cylinder3d.centeredOn point
-                Direction3d.z
-                { radius = Length.meters 0.75, length = Length.meters 0.3 }
-
-        glowingOrange =
-            Material.emissive (Light.color (Color.rgb255 255 127 0)) (Luminance.nits 5000)
-
-        material =
-            if active then
-                glowingOrange
-
-            else
-                Material.uniform Materials.chromium
-    in
-    case ( size, active ) of
-        ( FullRefill, True ) ->
-            let
-                orbPosition =
-                    Point3d.translateBy (Vector3d.meters 0 0 1.5) point
-            in
-            Scene3d.group
-                [ Scene3d.cylinder material shape
-                , Scene3d.sphere material
-                    (Sphere3d.atPoint orbPosition (Length.meters 0.6))
-                ]
-
-        _ ->
-            Scene3d.cylinder material shape
 
 
 simulateCar : Duration -> Game -> List Wheel -> Body Data -> Body Data
