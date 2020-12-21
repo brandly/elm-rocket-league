@@ -212,12 +212,12 @@ type alias ScreenSize =
 
 
 type alias Model =
-    { status : Status
+    { screen : Screen
     , screenSize : ScreenSize
     }
 
 
-type Status
+type Screen
     = Loading
     | LoadingError String
     | Playing Game
@@ -225,7 +225,7 @@ type Status
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { screenSize = { width = 0, height = 0 }, status = Loading }
+    ( { screenSize = { width = 0, height = 0 }, screen = Loading }
     , Cmd.batch
         [ Task.attempt TextureResponse <|
             Material.loadWith Material.trilinearFiltering
@@ -240,13 +240,13 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
         keepPlaying g =
-            { model | status = Playing g }
+            { model | screen = Playing g }
 
         mapPlayer : (Player -> Player) -> Model
         mapPlayer fn =
-            case model.status of
+            case model.screen of
                 Playing g ->
-                    { model | status = Playing { g | player = fn g.player } }
+                    { model | screen = Playing { g | player = fn g.player } }
 
                 _ ->
                     model
@@ -255,7 +255,7 @@ update msg model =
         mapControls fn =
             mapPlayer (\p -> { p | controls = fn p.controls })
     in
-    case ( model.status, msg ) of
+    case ( model.screen, msg ) of
         ( _, Resize w h ) ->
             ( { model | screenSize = { width = w, height = h } }
             , Cmd.none
@@ -452,7 +452,7 @@ update msg model =
 
         ( Loading, TextureResponse (Ok texture) ) ->
             ( { model
-                | status =
+                | screen =
                     Playing
                         { world =
                             initialWorld
@@ -482,7 +482,7 @@ update msg model =
 
         ( Loading, TextureResponse (Err err) ) ->
             ( { model
-                | status =
+                | screen =
                     LoadingError
                         (case err of
                             WebGL.Texture.LoadError ->
@@ -543,7 +543,7 @@ view model =
         , Html.Attributes.style "left" "0"
         , Html.Attributes.style "top" "0"
         ]
-        (case model.status of
+        (case model.screen of
             Loading ->
                 [ Html.p [] [ Html.text "Loading........" ] ]
 
