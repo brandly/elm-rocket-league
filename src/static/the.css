@@ -53,10 +53,10 @@ p {
   border-radius: 8px;
 }
 .hud-clock {
-  width: 120px;
+  min-width: 120px;
 }
 .hud-score {
-  width: 60px;
+  min-width: 60px;
 }
 .hud-score-orange {
   background: var(--orange);

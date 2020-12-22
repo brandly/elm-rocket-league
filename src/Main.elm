@@ -127,6 +127,7 @@ type Status
     | Live
     | Paused Status
     | Replay Float
+    | GameOver
 
 
 type alias Player =
@@ -451,6 +452,9 @@ updateGame config tick game =
             else
                 { game | lastTick = currentTick }
 
+        GameOver ->
+            game
+
         Live ->
             let
                 player =
@@ -522,6 +526,12 @@ updateGame config tick game =
 
                     else
                         num
+
+                currentTimeLeft =
+                    Quantity.minus (Duration.milliseconds tick) game.timeLeft
+
+                ballOnGround =
+                    inMeters (Point3d.zCoordinate ballPoint) <= inMeters ballSettings.radius
             in
             { game
                 | world =
@@ -536,18 +546,21 @@ updateGame config tick game =
                                 |> applyRockets
                     }
                 , lastTick = currentTick
+                , timeLeft = currentTimeLeft
                 , refills = game.refills |> List.map applyCarHit
                 , score =
                     { blue = incrementIf blueGoal game.score.blue
                     , orange = incrementIf orangeGoal game.score.orange
                     }
                 , status =
-                    if blueGoal || orangeGoal then
+                    if ballOnGround && Duration.inSeconds currentTimeLeft <= 0 then
+                        GameOver
+
+                    else if blueGoal || orangeGoal then
                         Replay currentTick
 
                     else
                         game.status
-                , timeLeft = Quantity.minus (Duration.milliseconds tick) game.timeLeft
             }
 
 
@@ -879,10 +892,10 @@ viewClock : Duration -> Html Msg
 viewClock timeLeft =
     let
         minutes =
-            Basics.floor <| Duration.inMinutes timeLeft
+            max 0 (Basics.floor (Duration.inMinutes timeLeft))
 
         seconds =
-            remainderBy 60 <| Basics.floor <| Duration.inSeconds timeLeft
+            max 0 (remainderBy 60 <| Basics.floor <| Duration.inSeconds timeLeft)
 
         twoChar str =
             if String.length str < 2 then
@@ -1476,11 +1489,16 @@ base =
         |> Body.moveTo offset
 
 
+ballSettings =
+    { radius = Length.meters 2
+    }
+
+
 ball : Body Data
 ball =
     let
         shape =
-            Sphere3d.atOrigin (Length.meters 2)
+            Sphere3d.atOrigin ballSettings.radius
 
         entity =
             Scene3d.sphereWithShadow (Material.uniform Materials.chromium) shape
@@ -1491,7 +1509,7 @@ ball =
         |> Body.sphere shape
         |> Body.withMaterial (Physics.Material.custom { friction = 0.3, bounciness = 0.8 })
         |> Body.withBehavior (Body.dynamic (Mass.kilograms 1))
-        |> Body.moveTo (Point3d.meters 0 0 2)
+        |> Body.moveTo (Point3d.meters 0 0 (inMeters ballSettings.radius))
 
 
 floor : Material.Texture Color -> Body Data
