@@ -71,6 +71,14 @@ p {
   /* TODO: bounce */
 }
 
+.hud-cam {
+  text-transform: uppercase;
+  color: #FFF;
+}
+.hud-cam-indicator {
+  color: red;
+}
+
 .center-popup {
   position: fixed;
   top: 50%;

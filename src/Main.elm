@@ -883,6 +883,20 @@ viewGame { width, height } { world, player, refills, lastTick, score, status, ti
         , Html.p []
             [ Html.text "BOOST" ]
         ]
+    , case player.focus of
+        BallCam ->
+            Html.div [ Html.Attributes.class "hud-pane-msg hud-bottom-left hud-cam" ]
+                [ Html.p
+                    [ Html.Attributes.style "font-size" "24px"
+                    , Html.Attributes.class "hud-cam-indicator"
+                    ]
+                    [ Html.text "• Ball cam" ]
+                , Html.p []
+                    [ Html.text "Press (C) to toggle" ]
+                ]
+
+        _ ->
+            Html.text ""
     , case status of
         Replay _ ->
             Html.h1 [ Html.Attributes.class "hud-pane hud-pane-msg center-popup" ] [ Html.text "GOOAAALLLL!!!!!" ]
