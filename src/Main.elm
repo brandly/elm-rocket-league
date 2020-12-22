@@ -172,6 +172,7 @@ type Msg
     = Tick Float
     | Resize Float Float
     | StartGame
+    | LeaveGame
     | KeyDown Command
     | KeyUp Command
     | TextureResponse (Result WebGL.Texture.Error (Material.Texture Color))
@@ -389,6 +390,9 @@ update msg model =
         ( Playing _ _, StartGame ) ->
             ( model, Cmd.none )
 
+        ( Playing _ config, LeaveGame ) ->
+            ( { model | screen = Menu config }, Cmd.none )
+
         ( Loading, TextureResponse (Ok texture) ) ->
             ( { model | screen = Menu { texture = texture } }, Cmd.none )
 
@@ -457,8 +461,8 @@ updateGame config tick game =
 
         Live ->
             let
-                player =
-                    game.player
+                { player, score } =
+                    game
 
                 controls =
                     player.controls
@@ -549,11 +553,11 @@ updateGame config tick game =
                 , timeLeft = currentTimeLeft
                 , refills = game.refills |> List.map applyCarHit
                 , score =
-                    { blue = incrementIf blueGoal game.score.blue
-                    , orange = incrementIf orangeGoal game.score.orange
+                    { blue = incrementIf blueGoal score.blue
+                    , orange = incrementIf orangeGoal score.orange
                     }
                 , status =
-                    if ballOnGround && Duration.inSeconds currentTimeLeft <= 0 then
+                    if ballOnGround && Duration.inSeconds currentTimeLeft <= 0 && score.blue /= score.orange then
                         GameOver
 
                     else if blueGoal || orangeGoal then
@@ -883,6 +887,23 @@ viewGame { width, height } { world, player, refills, lastTick, score, status, ti
         Replay _ ->
             Html.h1 [ Html.Attributes.class "hud-pane hud-pane-msg center-popup" ] [ Html.text "GOOAAALLLL!!!!!" ]
 
+        GameOver ->
+            Html.div [ Html.Attributes.class "hud-pane hud-pane-msg center-popup" ]
+                [ Html.h1 []
+                    [ Html.text
+                        (if score.blue > score.orange then
+                            "Blue wins!!!"
+
+                         else
+                            "Orange wins!!!"
+                        )
+                    ]
+                , Html.div [ Html.Attributes.class "btn-row" ]
+                    [ Html.button [ Html.Attributes.class "btn-primary", Html.Events.onClick LeaveGame ]
+                        [ Html.text "Menu" ]
+                    ]
+                ]
+
         _ ->
             Html.text ""
     ]
@@ -895,7 +916,7 @@ viewClock timeLeft =
             max 0 (Basics.floor (Duration.inMinutes timeLeft))
 
         seconds =
-            max 0 (remainderBy 60 <| Basics.floor <| Duration.inSeconds timeLeft)
+            max 0 (remainderBy 60 <| Basics.ceiling <| Duration.inSeconds timeLeft)
 
         twoChar str =
             if String.length str < 2 then
