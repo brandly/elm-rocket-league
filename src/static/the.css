@@ -31,6 +31,13 @@ p {
   text-align: right;
 }
 
+.hud-top-center {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 .center-popup {
   position: fixed;
   top: 50%;

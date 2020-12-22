@@ -114,6 +114,10 @@ type alias Game =
     , lastTick : Float
     , refills : List Refill
     , status : Status
+    , score :
+        { blue : Int
+        , orange : Int
+        }
     }
 
 
@@ -121,7 +125,7 @@ type Status
     = Preparing
     | Live
     | Paused Status
-    | Replay
+    | Replay Float
 
 
 type alias Player =
@@ -239,11 +243,16 @@ type alias Model =
     }
 
 
+type alias Config =
+    { texture : Material.Texture Color
+    }
+
+
 type Screen
     = Loading
     | LoadingError String
-    | Menu (Material.Texture Color)
-    | Playing Game
+    | Menu Config
+    | Playing Game Config
 
 
 init : () -> ( Model, Cmd Msg )
@@ -262,17 +271,18 @@ init _ =
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
-        keepPlaying g =
-            { model | screen = Playing g }
-
-        mapPlayer : (Player -> Player) -> Model
-        mapPlayer fn =
+        mapGame : (Game -> Game) -> Model
+        mapGame fn =
             case model.screen of
-                Playing g ->
-                    { model | screen = Playing { g | player = fn g.player } }
+                Playing g config ->
+                    { model | screen = Playing (fn g) config }
 
                 _ ->
                     model
+
+        mapPlayer : (Player -> Player) -> Model
+        mapPlayer fn =
+            mapGame (\g -> { g | player = fn g.player })
 
         mapControls : (Controls -> Controls) -> Model
         mapControls fn =
@@ -284,22 +294,22 @@ update msg model =
             , Cmd.none
             )
 
-        ( Menu texture, StartGame ) ->
-            ( { model | screen = initGameScreen texture }, Cmd.none )
+        ( Menu config, StartGame ) ->
+            ( { model | screen = Playing (initGame config) config }, Cmd.none )
 
         ( Menu _, _ ) ->
             ( model, Cmd.none )
 
-        ( Playing game, Tick tick ) ->
-            ( updateGame game tick
-                |> keepPlaying
+        ( Playing game config, Tick tick ) ->
+            ( updateGame config tick
+                |> mapGame
             , Cmd.none
             )
 
-        ( Playing game, KeyDown cmd ) ->
+        ( Playing game _, KeyDown cmd ) ->
             case cmd of
                 Jump ->
-                    ( keepPlaying { game | world = World.update applyJump game.world }
+                    ( mapGame (\g -> { g | world = World.update applyJump g.world })
                     , Cmd.none
                     )
 
@@ -330,12 +340,12 @@ update msg model =
                 TogglePause ->
                     case game.status of
                         Paused status ->
-                            ( keepPlaying { game | status = status }, Cmd.none )
+                            ( mapGame (\g -> { g | status = status }), Cmd.none )
 
                         _ ->
-                            ( keepPlaying { game | status = Paused game.status }, Cmd.none )
+                            ( mapGame (\g -> { g | status = Paused g.status }), Cmd.none )
 
-        ( Playing game, KeyUp cmd ) ->
+        ( Playing _ _, KeyUp cmd ) ->
             case cmd of
                 Jump ->
                     ( model, Cmd.none )
@@ -371,14 +381,14 @@ update msg model =
                 TogglePause ->
                     ( model, Cmd.none )
 
-        ( Playing _, TextureResponse _ ) ->
+        ( Playing _ _, TextureResponse _ ) ->
             ( model, Cmd.none )
 
-        ( Playing _, StartGame ) ->
+        ( Playing _ _, StartGame ) ->
             ( model, Cmd.none )
 
         ( Loading, TextureResponse (Ok texture) ) ->
-            ( { model | screen = Menu texture }, Cmd.none )
+            ( { model | screen = Menu { texture = texture } }, Cmd.none )
 
         ( Loading, TextureResponse (Err err) ) ->
             ( { model
@@ -402,8 +412,8 @@ update msg model =
             ( model, Cmd.none )
 
 
-updateGame : Game -> Float -> Game
-updateGame game tick =
+updateGame : Config -> Float -> Game -> Game
+updateGame config tick game =
     let
         currentTick =
             game.lastTick + tick
@@ -412,8 +422,22 @@ updateGame game tick =
         Paused _ ->
             game
 
-        Replay ->
-            game
+        Replay startTime ->
+            if currentTick - startTime > 3000 then
+                let
+                    g =
+                        initGame config
+                in
+                { g | score = game.score }
+
+            else
+                { game
+                    | world =
+                        game.world
+                            |> World.update (updateBody game tick)
+                            |> World.simulate (Duration.seconds (tick / 1000))
+                    , lastTick = currentTick
+                }
 
         Preparing ->
             if currentTick > 2000 then
@@ -438,6 +462,14 @@ updateGame game tick =
                     game.world
                         |> World.bodies
                         |> List.filter (Body.data >> .id >> isCar)
+                        |> List.head
+                        |> Maybe.map Body.originPoint
+                        |> Maybe.withDefault (Point3d.meters 0 0 0)
+
+                ballPoint =
+                    game.world
+                        |> World.bodies
+                        |> List.filter (Body.data >> .id >> isBall)
                         |> List.head
                         |> Maybe.map Body.originPoint
                         |> Maybe.withDefault (Point3d.meters 0 0 0)
@@ -477,29 +509,23 @@ updateGame game tick =
                     in
                     min boostSettings.max (adding + boostTank)
 
-                bodyUpdate body =
-                    case (Body.data body).id of
-                        Car wheels ->
-                            let
-                                boost =
-                                    if controls.rockets && player.boostTank > 0 then
-                                        Body.applyForce (Force.newtons 30000)
-                                            (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
-                                            (Body.originPoint body)
+                blueGoal =
+                    (Length.inMeters << Point3d.xCoordinate) ballPoint > (roomSize.length / 2)
 
-                                    else
-                                        identity
-                            in
-                            simulateCar (Duration.milliseconds tick) game.world controls wheels body
-                                |> boost
+                orangeGoal =
+                    (Length.inMeters << Point3d.xCoordinate) ballPoint < (-roomSize.length / 2)
 
-                        _ ->
-                            body
+                incrementIf bool num =
+                    if bool then
+                        num + 1
+
+                    else
+                        num
             in
             { game
                 | world =
                     game.world
-                        |> World.update bodyUpdate
+                        |> World.update (updateBody game tick)
                         |> World.simulate (Duration.seconds (tick / 1000))
                 , player =
                     { player
@@ -510,33 +536,64 @@ updateGame game tick =
                     }
                 , lastTick = currentTick
                 , refills = game.refills |> List.map applyCarHit
+                , score =
+                    { blue = incrementIf blueGoal game.score.blue
+                    , orange = incrementIf orangeGoal game.score.orange
+                    }
+                , status =
+                    if blueGoal || orangeGoal then
+                        Replay currentTick
+
+                    else
+                        game.status
             }
 
 
-initGameScreen : Material.Texture Color -> Screen
-initGameScreen texture =
-    Playing
-        { world =
-            initialWorld
-                |> World.add (floor texture)
-        , player =
-            { controls =
-                { rockets = False
-                , steering = 0
-                , speeding = 0
-                , braking = False
-                }
-            , boostTank = boostSettings.initial
-            , focus = BallCam
+updateBody : Game -> Float -> Body Data -> Body Data
+updateBody game tick body =
+    case (Body.data body).id of
+        Car wheels ->
+            let
+                boost =
+                    if game.player.controls.rockets && game.player.boostTank > 0 then
+                        Body.applyForce (Force.newtons 30000)
+                            (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
+                            (Body.originPoint body)
+
+                    else
+                        identity
+            in
+            simulateCar (Duration.milliseconds tick) game.world game.player.controls wheels body
+                |> boost
+
+        _ ->
+            body
+
+
+initGame : Config -> Game
+initGame config =
+    { world =
+        initialWorld
+            |> World.add (floor config.texture)
+    , player =
+        { controls =
+            { rockets = False
+            , steering = 0
+            , speeding = 0
+            , braking = False
             }
-        , lastTick = 0
-        , refills =
-            Refill.init
-                { startTime = -boostSettings.reloadTime
-                , measure = roomSize.length / 10.8
-                }
-        , status = Preparing
+        , boostTank = boostSettings.initial
+        , focus = BallCam
         }
+    , lastTick = 0
+    , refills =
+        Refill.init
+            { startTime = -boostSettings.reloadTime
+            , measure = roomSize.length / 10.8
+            }
+    , status = Preparing
+    , score = { blue = 0, orange = 0 }
+    }
 
 
 applyJump : Body Data -> Body Data
@@ -559,7 +616,7 @@ applyJump body =
 subscriptions : Model -> Sub Msg
 subscriptions { screen } =
     case screen of
-        Playing game ->
+        Playing game _ ->
             case game.status of
                 Paused _ ->
                     Sub.batch
@@ -619,7 +676,7 @@ view model =
                     ]
                 ]
 
-            Playing game ->
+            Playing game _ ->
                 viewGame model.screenSize game
 
             LoadingError error ->
@@ -628,7 +685,7 @@ view model =
 
 
 viewGame : ScreenSize -> Game -> List (Html Msg)
-viewGame { width, height } { world, player, refills, lastTick } =
+viewGame { width, height } { world, player, refills, lastTick, score, status } =
     let
         car =
             world
@@ -773,6 +830,9 @@ viewGame { width, height } { world, player, refills, lastTick } =
         , clipDepth = meters 0.1
         , entities = drawables
         }
+    , Html.div [ Html.Attributes.class "hud-pane hud-top-center" ]
+        [ Html.p [] [ Html.text <| "blue: " ++ String.fromInt score.blue ++ " orange: " ++ String.fromInt score.orange ]
+        ]
     , Html.div [ Html.Attributes.class "hud-pane hud-bottom-left" ]
         [ Html.p [] [ Html.text "Drive - Arrow keys" ]
         , Html.p [] [ Html.text "Boost - Shift" ]
@@ -786,6 +846,12 @@ viewGame { width, height } { world, player, refills, lastTick } =
         , Html.p []
             [ Html.text "BOOST" ]
         ]
+    , case status of
+        Replay _ ->
+            Html.h1 [ Html.Attributes.class "hud-pane center-popup" ] [ Html.text "GOOAAALLLL!!!!!" ]
+
+        _ ->
+            Html.text ""
     ]
 
 
