@@ -112,6 +112,7 @@ type alias Game =
     { world : World Data
     , player : Player
     , lastTick : Float
+    , timeLeft : Quantity Float Duration.Seconds
     , refills : List Refill
     , status : Status
     , score :
@@ -428,14 +429,14 @@ updateGame config tick game =
                     g =
                         initGame config
                 in
-                { g | score = game.score }
+                { g | score = game.score, timeLeft = game.timeLeft }
 
             else
                 { game
                     | world =
                         game.world
                             |> World.update (updateBody game tick)
-                            |> World.simulate (Duration.seconds (tick / 1000))
+                            |> World.simulate (Duration.milliseconds tick)
                     , lastTick = currentTick
                 }
 
@@ -546,6 +547,7 @@ updateGame config tick game =
 
                     else
                         game.status
+                , timeLeft = Quantity.minus (Duration.milliseconds tick) game.timeLeft
             }
 
 
@@ -593,6 +595,7 @@ initGame config =
             }
     , status = Preparing
     , score = { blue = 0, orange = 0 }
+    , timeLeft = Quantity (Duration.minutes 5 |> Duration.inSeconds)
     }
 
 
@@ -706,7 +709,7 @@ view model =
 
 
 viewGame : ScreenSize -> Game -> List (Html Msg)
-viewGame { width, height } { world, player, refills, lastTick, score, status } =
+viewGame { width, height } { world, player, refills, lastTick, score, status, timeLeft } =
     let
         car =
             world
@@ -853,6 +856,7 @@ viewGame { width, height } { world, player, refills, lastTick, score, status } =
         }
     , Html.div [ Html.Attributes.class "hud-pane hud-top-center" ]
         [ Html.p [] [ Html.text <| "blue: " ++ String.fromInt score.blue ++ " orange: " ++ String.fromInt score.orange ]
+        , viewClock timeLeft
         ]
     , Html.div [ Html.Attributes.class "hud-pane hud-bottom-right" ]
         [ Html.p
@@ -868,6 +872,29 @@ viewGame { width, height } { world, player, refills, lastTick, score, status } =
         _ ->
             Html.text ""
     ]
+
+
+viewClock : Duration -> Html Msg
+viewClock timeLeft =
+    let
+        minutes =
+            Basics.floor <| Duration.inMinutes timeLeft
+
+        seconds =
+            remainderBy 60 <| Basics.floor <| Duration.inSeconds timeLeft
+
+        twoChar str =
+            if String.length str < 2 then
+                twoChar ("0" ++ str)
+
+            else
+                str
+    in
+    Html.p []
+        [ Html.text (String.fromInt minutes)
+        , Html.text ":"
+        , Html.text (twoChar (String.fromInt seconds))
+        ]
 
 
 renderWheels : Body Data -> List Wheel -> List (Scene3d.Entity WorldCoordinates)
