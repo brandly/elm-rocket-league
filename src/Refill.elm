@@ -1,12 +1,12 @@
 module Refill exposing (Refill, Size(..), init, isActive, view)
 
-import Color exposing (Color)
-import Cylinder3d exposing (Cylinder3d)
-import Direction3d exposing (Direction3d)
-import Length exposing (Length, Meters, inMeters, meters)
+import Color
+import Cylinder3d
+import Direction3d
+import Length exposing (Meters, meters)
 import Luminance
 import Materials
-import Physics.Coordinates exposing (BodyCoordinates, WorldCoordinates)
+import Physics.Coordinates exposing (WorldCoordinates)
 import Point3d exposing (Point3d)
 import Scene3d
 import Scene3d.Light as Light
