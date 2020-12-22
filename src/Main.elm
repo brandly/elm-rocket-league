@@ -854,11 +854,12 @@ viewGame { width, height } { world, player, refills, lastTick, score, status, ti
         , clipDepth = meters 0.1
         , entities = drawables
         }
-    , Html.div [ Html.Attributes.class "hud-pane hud-top-center" ]
-        [ Html.p [] [ Html.text <| "blue: " ++ String.fromInt score.blue ++ " orange: " ++ String.fromInt score.orange ]
+    , Html.div [ Html.Attributes.class "hud-pane hud-top-center hud-score-clock" ]
+        [ Html.span [ Html.Attributes.class "hud-score hud-score-orange" ] [ Html.text <| String.fromInt score.orange ]
         , viewClock timeLeft
+        , Html.span [ Html.Attributes.class "hud-score hud-score-blue" ] [ Html.text <| String.fromInt score.blue ]
         ]
-    , Html.div [ Html.Attributes.class "hud-pane hud-bottom-right" ]
+    , Html.div [ Html.Attributes.class "hud-pane hud-pane-msg hud-bottom-right" ]
         [ Html.p
             [ Html.Attributes.style "font-size" "48px" ]
             [ Html.text (String.fromInt (round player.boostTank)) ]
@@ -867,7 +868,7 @@ viewGame { width, height } { world, player, refills, lastTick, score, status, ti
         ]
     , case status of
         Replay _ ->
-            Html.h1 [ Html.Attributes.class "hud-pane center-popup" ] [ Html.text "GOOAAALLLL!!!!!" ]
+            Html.h1 [ Html.Attributes.class "hud-pane hud-pane-msg center-popup" ] [ Html.text "GOOAAALLLL!!!!!" ]
 
         _ ->
             Html.text ""
@@ -890,7 +891,7 @@ viewClock timeLeft =
             else
                 str
     in
-    Html.p []
+    Html.span [ Html.Attributes.class "hud-clock" ]
         [ Html.text (String.fromInt minutes)
         , Html.text ":"
         , Html.text (twoChar (String.fromInt seconds))

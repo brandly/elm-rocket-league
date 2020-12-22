@@ -1,3 +1,9 @@
+:root {
+  --blue: #2b8ee4;
+  --orange: orange;
+}
+
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
 }
@@ -13,9 +19,8 @@ p {
 }
 
 .hud-pane {
-  padding: 6px 12px;
-  border-radius: 4px;
-  background-color: rgba(255,255,255, 0.5);
+  background-color: rgba(0,0,0, 0.5);
+  color: #FFF;
 }
 
 .hud-bottom-left {
@@ -36,6 +41,34 @@ p {
   top: 24px;
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+}
+
+.hud-score-clock {
+  font-size: 48px;
+  border-radius: 8px;
+}
+.hud-score-clock > span {
+  text-align: center;
+  border-radius: 8px;
+}
+.hud-clock {
+  width: 120px;
+}
+.hud-score {
+  width: 60px;
+}
+.hud-score-orange {
+  background: var(--orange);
+}
+.hud-score-blue {
+  background: var(--blue);
+}
+
+.hud-pane-msg {
+  padding: 6px 12px;
+  border-radius: 4px;
+  /* TODO: bounce */
 }
 
 .center-popup {
@@ -66,7 +99,7 @@ p {
   margin: 0;
   padding: 12px 18px;
   border-radius: 4px;
-  background: #2b8ee4;
+  background: var(--blue);
   color: #FFF;
   font-weight: bold;
   font-size: 16px;
