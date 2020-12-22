@@ -664,15 +664,36 @@ keyDecoder toMsg =
 
 view : Model -> Html Msg
 view model =
+    let
+        controls =
+            [ ( "Drive", "Arrow keys" )
+            , ( "Boost", "Shift" )
+            , ( "Toggle Camera", "C" )
+            , ( "Jump (buggy)", "Spacebar" )
+            ]
+    in
     Html.div [ Html.Attributes.class "container" ]
         (case model.screen of
             Loading ->
                 [ Html.p [ Html.Attributes.class "center-popup" ] [ Html.text "Loading..." ] ]
 
             Menu _ ->
-                [ Html.p [ Html.Attributes.class "center-popup" ]
+                [ Html.div [ Html.Attributes.class "center-popup" ]
                     [ Html.h1 [] [ Html.text "Rocket League" ]
-                    , Html.button [ Html.Events.onClick StartGame ] [ Html.text "Start" ]
+                    , Html.div []
+                        (List.map
+                            (\( action, key ) ->
+                                Html.div [ Html.Attributes.class "controls-row" ]
+                                    [ Html.span [] [ Html.text action ]
+                                    , Html.span [] [ Html.text key ]
+                                    ]
+                            )
+                            controls
+                        )
+                    , Html.div [ Html.Attributes.class "btn-row" ]
+                        [ Html.button [ Html.Events.onClick StartGame, Html.Attributes.class "btn-primary" ]
+                            [ Html.text "Let's go!" ]
+                        ]
                     ]
                 ]
 
@@ -832,12 +853,6 @@ viewGame { width, height } { world, player, refills, lastTick, score, status } =
         }
     , Html.div [ Html.Attributes.class "hud-pane hud-top-center" ]
         [ Html.p [] [ Html.text <| "blue: " ++ String.fromInt score.blue ++ " orange: " ++ String.fromInt score.orange ]
-        ]
-    , Html.div [ Html.Attributes.class "hud-pane hud-bottom-left" ]
-        [ Html.p [] [ Html.text "Drive - Arrow keys" ]
-        , Html.p [] [ Html.text "Boost - Shift" ]
-        , Html.p [] [ Html.text "Toggle Camera - C" ]
-        , Html.p [] [ Html.text "Jump (buggy) - Spacebar" ]
         ]
     , Html.div [ Html.Attributes.class "hud-pane hud-bottom-right" ]
         [ Html.p
@@ -1394,7 +1409,7 @@ base =
 
         material =
             Material.nonmetal
-                { baseColor = Color.rgb255 0 180 180
+                { baseColor = Color.rgb255 43 142 228
                 , roughness = 0.5
                 }
 
