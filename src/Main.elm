@@ -123,7 +123,7 @@ type alias Game =
 
 
 type Status
-    = Preparing
+    = Preparing Bool
     | Live
     | Paused Status
     | Replay Float
@@ -440,21 +440,33 @@ updateGame config tick game =
                 { game
                     | world =
                         game.world
-                            |> World.update (updateBody game tick)
+                            |> World.update (updateBody False game tick)
                             |> World.simulate (Duration.milliseconds tick)
                     , lastTick = currentTick
                 }
 
-        Preparing ->
-            if currentTick > 2000 then
+        Preparing hasCar ->
+            if currentTick > 4000 then
                 { game
                     | status = Live
-                    , world = World.add base game.world
                     , lastTick = currentTick
                 }
 
+            else if not hasCar && tick < 40 then
+                { game
+                    | world = World.add base game.world
+                    , lastTick = currentTick
+                    , status = Preparing True
+                }
+
             else
-                { game | lastTick = currentTick }
+                { game
+                    | lastTick = currentTick
+                    , world =
+                        game.world
+                            |> World.update (updateBody True game tick)
+                            |> World.simulate (Duration.milliseconds tick)
+                }
 
         GameOver ->
             game
@@ -540,8 +552,8 @@ updateGame config tick game =
             { game
                 | world =
                     game.world
-                        |> World.update (updateBody game tick)
-                        |> World.simulate (Duration.seconds (tick / 1000))
+                        |> World.update (updateBody False game tick)
+                        |> World.simulate (Duration.milliseconds tick)
                 , player =
                     { player
                         | boostTank =
@@ -568,21 +580,28 @@ updateGame config tick game =
             }
 
 
-updateBody : Game -> Float -> Body Data -> Body Data
-updateBody game tick body =
+updateBody : Bool -> Game -> Float -> Body Data -> Body Data
+updateBody dry game tick body =
     case (Body.data body).id of
         Car wheels ->
             let
                 boost =
-                    if game.player.controls.rockets && game.player.boostTank > 0 then
+                    if not dry && game.player.controls.rockets && game.player.boostTank > 0 then
                         Body.applyForce (Force.newtons 30000)
                             (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
                             (Body.originPoint body)
 
                     else
                         identity
+
+                controls =
+                    if dry then
+                        initControls
+
+                    else
+                        game.player.controls
             in
-            simulateCar (Duration.milliseconds tick) game.world game.player.controls wheels body
+            simulateCar (Duration.milliseconds tick) game.world controls wheels body
                 |> boost
 
         _ ->
@@ -595,12 +614,7 @@ initGame config =
         initialWorld
             |> World.add (floor config.texture)
     , player =
-        { controls =
-            { rockets = False
-            , steering = 0
-            , speeding = 0
-            , braking = False
-            }
+        { controls = initControls
         , boostTank = boostSettings.initial
         , focus = BallCam
         }
@@ -610,9 +624,17 @@ initGame config =
             { startTime = -boostSettings.reloadTime
             , measure = roomSize.length / 10.8
             }
-    , status = Preparing
+    , status = Preparing False
     , score = { blue = 0, orange = 0 }
     , timeLeft = Quantity (Duration.minutes 5 |> Duration.inSeconds)
+    }
+
+
+initControls =
+    { rockets = False
+    , steering = 0
+    , speeding = 0
+    , braking = False
     }
 
 
@@ -898,6 +920,18 @@ viewGame { width, height } { world, player, refills, lastTick, score, status, ti
         _ ->
             Html.text ""
     , case status of
+        Preparing _ ->
+            if lastTick > 1000 then
+                let
+                    value =
+                        Duration.milliseconds (4000 - lastTick)
+                in
+                Html.h1 [ Html.Attributes.class "hud-pane hud-pane-msg center-popup" ]
+                    [ Html.text (String.fromInt (Basics.ceiling (Duration.inSeconds value))) ]
+
+            else
+                Html.text ""
+
         Replay _ ->
             Html.h1 [ Html.Attributes.class "hud-pane hud-pane-msg center-popup" ] [ Html.text "GOOAAALLLL!!!!!" ]
 
