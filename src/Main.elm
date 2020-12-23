@@ -926,11 +926,14 @@ viewGame { width, height } { world, player, refills, lastTick, score, status, ti
 viewClock : Duration -> Html Msg
 viewClock timeLeft =
     let
-        minutes =
-            max 0 (Basics.floor (Duration.inMinutes timeLeft))
+        ceilSeconds =
+            Basics.ceiling <| Duration.inSeconds timeLeft
 
         seconds =
-            max 0 (remainderBy 60 <| Basics.ceiling <| Duration.inSeconds timeLeft)
+            max 0 (remainderBy 60 <| ceilSeconds)
+
+        minutes =
+            max 0 (Basics.floor (toFloat ceilSeconds / 60))
 
         twoChar str =
             if String.length str < 2 then
