@@ -123,7 +123,7 @@ type alias Game =
 
 
 type Status
-    = Preparing Bool
+    = Preparing Bool (Quantity Float Duration.Seconds)
     | Live
     | Paused Status
     | Replay Float
@@ -445,27 +445,25 @@ updateGame config tick game =
                     , lastTick = currentTick
                 }
 
-        Preparing hasCar ->
-            if currentTick > 4000 then
-                { game
-                    | status = Live
-                    , lastTick = currentTick
-                }
+        Preparing hasCar countdown ->
+            if Duration.inSeconds countdown <= 0 then
+                { game | status = Live }
 
             else if not hasCar && tick < 40 then
                 { game
                     | world = World.add base game.world
-                    , lastTick = currentTick
-                    , status = Preparing True
+                    , status = Preparing True countdown
                 }
 
             else
                 { game
-                    | lastTick = currentTick
-                    , world =
+                    | world =
                         game.world
                             |> World.update (updateBody True game tick)
                             |> World.simulate (Duration.milliseconds tick)
+                    , status =
+                        Preparing hasCar
+                            (Quantity.minus (Duration.milliseconds tick) countdown)
                 }
 
         GameOver ->
@@ -624,7 +622,7 @@ initGame config =
             { startTime = -boostSettings.reloadTime
             , measure = roomSize.length / 10.8
             }
-    , status = Preparing False
+    , status = Preparing False (Duration.seconds 3)
     , score = { blue = 0, orange = 0 }
     , timeLeft = Quantity (Duration.minutes 5 |> Duration.inSeconds)
     }
@@ -920,17 +918,9 @@ viewGame { width, height } { world, player, refills, lastTick, score, status, ti
         _ ->
             Html.text ""
     , case status of
-        Preparing _ ->
-            if lastTick > 1000 then
-                let
-                    value =
-                        Duration.milliseconds (4000 - lastTick)
-                in
-                Html.h1 [ Html.Attributes.class "hud-pane hud-pane-msg center-popup" ]
-                    [ Html.text (String.fromInt (Basics.ceiling (Duration.inSeconds value))) ]
-
-            else
-                Html.text ""
+        Preparing _ countdown ->
+            Html.h1 [ Html.Attributes.class "hud-pane hud-pane-msg center-popup" ]
+                [ Html.text (String.fromInt (Basics.ceiling (Duration.inSeconds countdown))) ]
 
         Replay _ ->
             Html.h1 [ Html.Attributes.class "hud-pane hud-pane-msg center-popup" ] [ Html.text "GOOAAALLLL!!!!!" ]
