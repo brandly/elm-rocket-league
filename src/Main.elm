@@ -60,6 +60,16 @@ isBall id =
     id == Ball
 
 
+isCar : EntityId -> Bool
+isCar id =
+    case id of
+        Car _ _ ->
+            True
+
+        _ ->
+            False
+
+
 isPlayersCar : Player -> EntityId -> Bool
 isPlayersCar player id =
     case id of
@@ -159,6 +169,7 @@ samePlayerId (PlayerId a) (PlayerId b) =
 
 type alias Player =
     { id : PlayerId
+    , team : Team
     , driver : Driver
     , controls : Controls
     , boostTank : Float
@@ -275,9 +286,14 @@ type alias Model =
     }
 
 
+type Team
+    = Orange
+    | Blue
+
+
 type alias Config =
     { texture : Material.Texture Color
-    , drivers : List Driver
+    , drivers : List ( Driver, Team )
     }
 
 
@@ -438,7 +454,27 @@ update msg model =
             ( { model | screen = Menu config }, Cmd.none )
 
         ( Loading, TextureResponse (Ok texture) ) ->
-            ( { model | screen = Menu { texture = texture, drivers = [ Keyboard defaultKeyboard ] } }, Cmd.none )
+            ( { model
+                | screen =
+                    Menu
+                        { texture = texture
+                        , drivers =
+                            [ ( Keyboard defaultKeyboard, Blue )
+                            , ( Keyboard
+                                    (Dict.fromList
+                                        [ ( "a", Steer -1 )
+                                        , ( "d", Steer 1 )
+                                        , ( "w", Speed 1 )
+                                        , ( "s", Speed -1 )
+                                        ]
+                                    )
+                              , Orange
+                              )
+                            ]
+                        }
+              }
+            , Cmd.none
+            )
 
         ( Loading, TextureResponse (Err err) ) ->
             ( { model
@@ -495,7 +531,7 @@ updateGame config tick game =
 
             else if not hasCar && tick < 40 then
                 { game
-                    | world = List.foldl (\p w -> World.add (base p.id) w) game.world game.players
+                    | world = List.foldl (\p w -> World.add (base p) w) game.world game.players
                     , status = Preparing True countdown
                 }
 
@@ -526,39 +562,51 @@ updateGame config tick game =
                         |> Maybe.map Body.originPoint
                         |> Maybe.withDefault (Point3d.meters 0 0 0)
 
-                carHits : Player -> Refill -> Bool
-                carHits player { point, time } =
+                playerCars : List ( Player, Point3d Meters WorldCoordinates )
+                playerCars =
+                    game.world
+                        |> World.bodies
+                        |> List.filterMap
+                            (\car ->
+                                case ( (Body.data car).id, List.head game.players ) of
+                                    ( Car playerId _, Just somePlayer ) ->
+                                        Just
+                                            ( game.players
+                                                |> List.filter (.id >> (==) playerId)
+                                                |> List.head
+                                                |> Maybe.withDefault somePlayer
+                                            , Body.originPoint car
+                                            )
+
+                                    _ ->
+                                        Nothing
+                            )
+
+                carHits : ( Player, Point3d Meters WorldCoordinates ) -> Refill -> Bool
+                carHits ( player, carPoint ) { point, time } =
                     let
                         fullTank =
                             player.boostTank >= boostSettings.max
-
-                        carPoint =
-                            game.world
-                                |> World.bodies
-                                |> List.filter (Body.data >> .id >> isPlayersCar player)
-                                |> List.head
-                                |> Maybe.map Body.originPoint
-                                |> Maybe.withDefault (Point3d.meters 0 0 0)
                     in
                     not fullTank
                         && ((currentTick - time) > boostSettings.reloadTime)
                         && (Point3d.distanceFrom carPoint point |> Length.inMeters)
                         < 2.5
 
-                applyCarHit : Player -> Refill -> Refill
-                applyCarHit player refill =
-                    if refillIsActive currentTick refill && carHits player refill then
+                applyCarHit : ( Player, Point3d Meters WorldCoordinates ) -> Refill -> Refill
+                applyCarHit playerCar refill =
+                    if refillIsActive currentTick refill && carHits playerCar refill then
                         { refill | time = currentTick }
 
                     else
                         refill
 
-                applyRefills : Player -> Float -> Float
-                applyRefills player boostTank =
+                applyRefills : ( Player, Point3d Meters WorldCoordinates ) -> Float -> Float
+                applyRefills playerCar boostTank =
                     let
                         adding =
                             game.refills
-                                |> List.filter (carHits player)
+                                |> List.filter (carHits playerCar)
                                 |> List.map refillSize
                                 |> List.sum
                     in
@@ -590,21 +638,21 @@ updateGame config tick game =
                         |> World.simulate (Duration.milliseconds tick)
                 , players =
                     List.map
-                        (\player ->
+                        (\( player, carPoint ) ->
                             { player
                                 | boostTank =
                                     player.boostTank
-                                        |> applyRefills player
+                                        |> applyRefills ( player, carPoint )
                                         |> applyRockets player
                             }
                         )
-                        game.players
+                        playerCars
                 , lastTick = currentTick
                 , timeLeft = currentTimeLeft
                 , refills =
                     game.refills
                         |> List.map
-                            (\refill -> List.foldl applyCarHit refill game.players)
+                            (\refill -> List.foldl applyCarHit refill playerCars)
                 , score =
                     { blue = incrementIf blueGoal score.blue
                     , orange = incrementIf orangeGoal score.orange
@@ -667,8 +715,9 @@ initGame config =
             |> World.add (floor config.texture)
     , players =
         List.indexedMap
-            (\index driver ->
+            (\index ( driver, team ) ->
                 { id = PlayerId index
+                , team = team
                 , driver = driver
                 , controls = initControls
                 , boostTank = boostSettings.initial
@@ -725,37 +774,35 @@ applyRockets player boostTank =
 
 subscriptions : Model -> Sub Msg
 subscriptions { screen } =
+    let
+        playerEvents player =
+            [ Events.onKeyDown (keyDecoder player.driver (KeyDown player.id))
+            , Events.onKeyUp (keyDecoder player.driver (KeyUp player.id))
+            ]
+
+        resize =
+            Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
+    in
     case screen of
         Playing game _ ->
             case game.status of
                 Paused _ ->
                     (Sub.batch << List.concat)
-                        ([ Events.onResize (\w h -> Resize (toFloat w) (toFloat h)) ]
-                            :: List.map
-                                (\player ->
-                                    [ Events.onKeyDown (keyDecoder player.driver (KeyDown player.id))
-                                    , Events.onKeyUp (keyDecoder player.driver (KeyUp player.id))
-                                    ]
-                                )
+                        ([ resize ]
+                            :: List.map playerEvents
                                 game.players
                         )
 
                 _ ->
                     (Sub.batch << List.concat)
-                        ([ Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
+                        ([ resize
                          , Events.onAnimationFrameDelta Tick
                          ]
-                            :: List.map
-                                (\player ->
-                                    [ Events.onKeyDown (keyDecoder player.driver (KeyDown player.id))
-                                    , Events.onKeyUp (keyDecoder player.driver (KeyUp player.id))
-                                    ]
-                                )
-                                game.players
+                            :: List.map playerEvents game.players
                         )
 
         _ ->
-            Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
+            resize
 
 
 keyDecoder : Driver -> (Command -> Msg) -> Json.Decode.Decoder Msg
@@ -816,10 +863,35 @@ view model =
                             , viewClock game.timeLeft
                             , Html.span [ Html.Attributes.class "hud-score hud-score-blue" ] [ Html.text <| String.fromInt game.score.blue ]
                             ]
+
+                    commonEntities =
+                        List.concat
+                            [ game.world
+                                |> World.bodies
+                                |> List.filter (Body.data >> .id >> isCar)
+                                |> List.map
+                                    (\car_ ->
+                                        case (Body.data >> .id) car_ of
+                                            Car _ wheels ->
+                                                renderWheels car_ wheels
+
+                                            _ ->
+                                                []
+                                    )
+                                |> List.concat
+                            , List.map
+                                (\refill ->
+                                    Refill.view (refillIsActive game.lastTick refill) refill
+                                )
+                                game.refills
+                            ]
                 in
                 case humans of
                     [ p1 ] ->
-                        scoreboard :: viewGame model.screenSize p1 game
+                        scoreboard :: viewGame model.screenSize p1 game commonEntities
+
+                    [ p1, p2 ] ->
+                        scoreboard :: (viewGame model.screenSize p1 game commonEntities ++ viewGame model.screenSize p2 game commonEntities)
 
                     _ ->
                         [ Html.text ("Too many players: " ++ String.fromInt (List.length humans)) ]
@@ -829,8 +901,8 @@ view model =
         )
 
 
-viewGame : ScreenSize -> Player -> Game -> List (Html Msg)
-viewGame { width, height } player { world, refills, lastTick, score, status } =
+viewGame : ScreenSize -> Player -> Game -> List (Scene3d.Entity WorldCoordinates) -> List (Html Msg)
+viewGame { width, height } player { world, refills, lastTick, score, status } commonEntities =
     let
         car =
             world
@@ -915,39 +987,28 @@ viewGame { width, height } player { world, refills, lastTick, score, status } =
 
         drawables : List (Scene3d.Entity WorldCoordinates)
         drawables =
-            List.concat
-                [ world
-                    |> World.bodies
-                    |> List.filter
-                        (\body ->
-                            case (Body.data body).id of
-                                Obstacle ->
-                                    let
-                                        eyePoint =
-                                            Viewpoint3d.eyePoint (Camera3d.viewpoint camera)
+            commonEntities
+                ++ (world
+                        |> World.bodies
+                        |> List.filter
+                            (\body ->
+                                case (Body.data body).id of
+                                    Obstacle ->
+                                        let
+                                            eyePoint =
+                                                Viewpoint3d.eyePoint (Camera3d.viewpoint camera)
 
-                                        wallPlane =
-                                            Frame3d.xyPlane (Body.frame body)
-                                    in
-                                    Point3d.signedDistanceFrom wallPlane eyePoint
-                                        |> Quantity.greaterThan Quantity.zero
+                                            wallPlane =
+                                                Frame3d.xyPlane (Body.frame body)
+                                        in
+                                        Point3d.signedDistanceFrom wallPlane eyePoint
+                                            |> Quantity.greaterThan Quantity.zero
 
-                                _ ->
-                                    True
-                        )
-                    |> List.map getTransformedDrawable
-                , case ( car, Maybe.map (Body.data >> .id) car ) of
-                    ( Just car_, Just (Car _ wheels) ) ->
-                        renderWheels car_ wheels
-
-                    _ ->
-                        []
-                , List.map
-                    (\refill ->
-                        Refill.view (refillIsActive lastTick refill) refill
-                    )
-                    refills
-                ]
+                                    _ ->
+                                        True
+                            )
+                        |> List.map getTransformedDrawable
+                   )
 
         sunlight =
             Light.directional (Light.castsShadows True)
@@ -1580,12 +1641,21 @@ computeImpulseDenominator body point normal =
             dot
 
 
-base : PlayerId -> Body Data
-base playerId =
+base : Player -> Body Data
+base player =
     -- TODO: better car shape
     let
         offset =
-            Point3d.meters -35 0 1.1
+            let
+                x =
+                    case player.team of
+                        Blue ->
+                            -35
+
+                        Orange ->
+                            35
+            in
+            Point3d.meters x 0 1.1
 
         size =
             ( Length.meters 2.8, Length.meters 2, Length.meters 0.5 )
@@ -1595,7 +1665,13 @@ base playerId =
 
         material =
             Material.nonmetal
-                { baseColor = Color.rgb255 43 142 228
+                { baseColor =
+                    case player.team of
+                        Blue ->
+                            Color.rgb255 43 142 228
+
+                        Orange ->
+                            Color.rgb255 255 165 0
                 , roughness = 0.5
                 }
 
@@ -1626,7 +1702,7 @@ base playerId =
             , { defaultWheel | chassisConnectionPoint = Point3d.meters -1 -1 0 }
             ]
     in
-    { id = Car playerId wheels
+    { id = Car player.id wheels
     , entity = entity
     }
         |> Body.block shape
