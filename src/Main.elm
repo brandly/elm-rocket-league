@@ -891,7 +891,18 @@ view model =
                         scoreboard :: viewGame model.screenSize p1 game commonEntities
 
                     [ p1, p2 ] ->
-                        scoreboard :: (viewGame model.screenSize p1 game commonEntities ++ viewGame model.screenSize p2 game commonEntities)
+                        let
+                            screenSize =
+                                { width = model.screenSize.width / 2
+                                , height = model.screenSize.height
+                                }
+                        in
+                        scoreboard
+                            :: [ Html.div [ Html.Attributes.style "display" "flex" ]
+                                    [ Html.div [] (viewGame screenSize p1 game commonEntities)
+                                    , Html.div [] (viewGame screenSize p2 game commonEntities)
+                                    ]
+                               ]
 
                     _ ->
                         [ Html.text ("Too many players: " ++ String.fromInt (List.length humans)) ]
