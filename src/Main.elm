@@ -917,7 +917,10 @@ view model =
                 in
                 case humans of
                     [ p1 ] ->
-                        scoreboard :: viewPlayer model.screenSize p1 game commonEntities
+                        viewPlayer model.screenSize p1 game commonEntities
+                            ++ [ scoreboard
+                               , message
+                               ]
 
                     [ p1, p2 ] ->
                         let
@@ -925,14 +928,24 @@ view model =
                                 { width = model.screenSize.width / 2
                                 , height = model.screenSize.height
                                 }
+
+                            playerViews =
+                                Html.div [ Html.Attributes.style "display" "flex" ]
+                                    (humans
+                                        |> List.sortBy
+                                            (\p ->
+                                                case p.id of
+                                                    PlayerId int ->
+                                                        int
+                                            )
+                                        |> List.map
+                                            (\p ->
+                                                Html.div [ Html.Attributes.style "position" "relative" ]
+                                                    (viewPlayer screenSize p game commonEntities)
+                                            )
+                                    )
                         in
-                        scoreboard
-                            :: [ Html.div [ Html.Attributes.style "display" "flex" ]
-                                    [ Html.div [ Html.Attributes.style "position" "relative" ] (viewPlayer screenSize p1 game commonEntities)
-                                    , Html.div [ Html.Attributes.style "position" "relative" ] (viewPlayer screenSize p2 game commonEntities)
-                                    ]
-                               , message
-                               ]
+                        [ playerViews, scoreboard, message ]
 
                     _ ->
                         [ Html.text ("Too many players: " ++ String.fromInt (List.length humans)) ]
