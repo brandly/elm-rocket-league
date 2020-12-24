@@ -50,7 +50,7 @@ type alias Data =
 
 
 type EntityId
-    = Car (List Wheel)
+    = Car PlayerId (List Wheel)
     | Ball
     | Obstacle
 
@@ -60,11 +60,11 @@ isBall id =
     id == Ball
 
 
-isCar : EntityId -> Bool
-isCar id =
+isPlayersCar : Player -> EntityId -> Bool
+isPlayersCar player id =
     case id of
-        Car _ ->
-            True
+        Car playerId _ ->
+            samePlayerId playerId player.id
 
         _ ->
             False
@@ -110,7 +110,7 @@ defaultWheel =
 
 type alias Game =
     { world : World Data
-    , player : Player
+    , players : List Player
     , lastTick : Float
     , timeLeft : Quantity Float Duration.Seconds
     , refills : List Refill
@@ -134,8 +134,18 @@ type Driver
     = Keyboard (Dict String Command)
 
 
+type PlayerId
+    = PlayerId Int
+
+
+samePlayerId : PlayerId -> PlayerId -> Bool
+samePlayerId (PlayerId a) (PlayerId b) =
+    a == b
+
+
 type alias Player =
-    { driver : Driver
+    { id : PlayerId
+    , driver : Driver
     , controls : Controls
     , boostTank : Float
     , focus : CameraFocus
@@ -178,8 +188,8 @@ type Msg
     | Resize Float Float
     | StartGame
     | LeaveGame
-    | KeyDown Command
-    | KeyUp Command
+    | KeyDown PlayerId Command
+    | KeyUp PlayerId Command
     | TextureResponse (Result WebGL.Texture.Error (Material.Texture Color))
 
 
@@ -288,13 +298,27 @@ update msg model =
                 _ ->
                     model
 
-        mapPlayer : (Player -> Player) -> Model
-        mapPlayer fn =
-            mapGame (\g -> { g | player = fn g.player })
+        mapPlayer : PlayerId -> (Player -> Player) -> Model
+        mapPlayer playerId fn =
+            mapGame
+                (\g ->
+                    { g
+                        | players =
+                            List.map
+                                (\player ->
+                                    if samePlayerId player.id playerId then
+                                        fn player
 
-        mapControls : (Controls -> Controls) -> Model
-        mapControls fn =
-            mapPlayer (\p -> { p | controls = fn p.controls })
+                                    else
+                                        player
+                                )
+                                g.players
+                    }
+                )
+
+        mapControls : PlayerId -> (Controls -> Controls) -> Model
+        mapControls pid fn =
+            mapPlayer pid (\p -> { p | controls = fn p.controls })
     in
     case ( model.screen, msg ) of
         ( _, Resize w h ) ->
@@ -314,7 +338,7 @@ update msg model =
             , Cmd.none
             )
 
-        ( Playing game _, KeyDown cmd ) ->
+        ( Playing game _, KeyDown playerId cmd ) ->
             case cmd of
                 Jump ->
                     ( mapGame (\g -> { g | world = World.update applyJump g.world })
@@ -322,16 +346,16 @@ update msg model =
                     )
 
                 Rocket ->
-                    ( mapControls (\c -> { c | rockets = True }), Cmd.none )
+                    ( mapControls playerId (\c -> { c | rockets = True }), Cmd.none )
 
                 Steer k ->
-                    ( mapControls (\c -> { c | steering = k }), Cmd.none )
+                    ( mapControls playerId (\c -> { c | steering = k }), Cmd.none )
 
                 Speed k ->
-                    ( mapControls (\c -> { c | speeding = k }), Cmd.none )
+                    ( mapControls playerId (\c -> { c | speeding = k }), Cmd.none )
 
                 ToggleCam ->
-                    ( mapPlayer
+                    ( mapPlayer playerId
                         (\p ->
                             { p
                                 | focus =
@@ -353,13 +377,13 @@ update msg model =
                         _ ->
                             ( mapGame (\g -> { g | status = Paused g.status }), Cmd.none )
 
-        ( Playing _ _, KeyUp cmd ) ->
+        ( Playing _ _, KeyUp playerId cmd ) ->
             case cmd of
                 Jump ->
                     ( model, Cmd.none )
 
                 Rocket ->
-                    ( mapControls (\c -> { c | rockets = False }), Cmd.none )
+                    ( mapControls playerId (\c -> { c | rockets = False }), Cmd.none )
 
                 Steer k ->
                     let
@@ -370,7 +394,7 @@ update msg model =
                             else
                                 c.steering
                     in
-                    ( mapControls (\c -> { c | steering = steering c }), Cmd.none )
+                    ( mapControls playerId (\c -> { c | steering = steering c }), Cmd.none )
 
                 Speed k ->
                     let
@@ -381,7 +405,7 @@ update msg model =
                             else
                                 c.speeding
                     in
-                    ( mapControls (\c -> { c | speeding = speeding c }), Cmd.none )
+                    ( mapControls playerId (\c -> { c | speeding = speeding c }), Cmd.none )
 
                 ToggleCam ->
                     ( model, Cmd.none )
@@ -456,7 +480,7 @@ updateGame config tick game =
 
             else if not hasCar && tick < 40 then
                 { game
-                    | world = World.add base game.world
+                    | world = List.foldl (\p w -> World.add (base p.id) w) game.world game.players
                     , status = Preparing True countdown
                 }
 
@@ -476,19 +500,8 @@ updateGame config tick game =
 
         Live ->
             let
-                { player, score } =
+                { score } =
                     game
-
-                controls =
-                    player.controls
-
-                carPoint =
-                    game.world
-                        |> World.bodies
-                        |> List.filter (Body.data >> .id >> isCar)
-                        |> List.head
-                        |> Maybe.map Body.originPoint
-                        |> Maybe.withDefault (Point3d.meters 0 0 0)
 
                 ballPoint =
                     game.world
@@ -498,36 +511,39 @@ updateGame config tick game =
                         |> Maybe.map Body.originPoint
                         |> Maybe.withDefault (Point3d.meters 0 0 0)
 
-                fullTank =
-                    player.boostTank >= boostSettings.max
+                carHits : Player -> Refill -> Bool
+                carHits player { point, time } =
+                    let
+                        fullTank =
+                            player.boostTank >= boostSettings.max
 
-                carHits : Refill -> Bool
-                carHits { point, time } =
+                        carPoint =
+                            game.world
+                                |> World.bodies
+                                |> List.filter (Body.data >> .id >> isPlayersCar player)
+                                |> List.head
+                                |> Maybe.map Body.originPoint
+                                |> Maybe.withDefault (Point3d.meters 0 0 0)
+                    in
                     not fullTank
                         && ((currentTick - time) > boostSettings.reloadTime)
                         && (Point3d.distanceFrom carPoint point |> Length.inMeters)
                         < 2.5
 
-                applyCarHit : Refill -> Refill
-                applyCarHit refill =
-                    if refillIsActive currentTick refill && carHits refill then
+                applyCarHit : Player -> Refill -> Refill
+                applyCarHit player refill =
+                    if refillIsActive currentTick refill && carHits player refill then
                         { refill | time = currentTick }
 
                     else
                         refill
 
-                applyRockets boostTank =
-                    if controls.rockets then
-                        max 0 (boostTank - 0.5)
-
-                    else
-                        boostTank
-
-                applyRefills boostTank =
+                applyRefills : Player -> Float -> Float
+                applyRefills player boostTank =
                     let
                         adding =
                             game.refills
-                                |> List.filter carHits
+                                |> List.filter (carHits player)
                                 |> List.map refillSize
                                 |> List.sum
                     in
@@ -557,16 +573,23 @@ updateGame config tick game =
                     game.world
                         |> World.update (updateBody False game tick)
                         |> World.simulate (Duration.milliseconds tick)
-                , player =
-                    { player
-                        | boostTank =
-                            player.boostTank
-                                |> applyRefills
-                                |> applyRockets
-                    }
+                , players =
+                    List.map
+                        (\player ->
+                            { player
+                                | boostTank =
+                                    player.boostTank
+                                        |> applyRefills player
+                                        |> applyRockets player
+                            }
+                        )
+                        game.players
                 , lastTick = currentTick
                 , timeLeft = currentTimeLeft
-                , refills = game.refills |> List.map applyCarHit
+                , refills =
+                    game.refills
+                        |> List.map
+                            (\refill -> List.foldl applyCarHit refill game.players)
                 , score =
                     { blue = incrementIf blueGoal score.blue
                     , orange = incrementIf orangeGoal score.orange
@@ -586,23 +609,34 @@ updateGame config tick game =
 updateBody : Bool -> Game -> Float -> Body Data -> Body Data
 updateBody dry game tick body =
     case (Body.data body).id of
-        Car wheels ->
+        Car playerId wheels ->
             let
-                boost =
-                    if not dry && game.player.controls.rockets && game.player.boostTank > 0 then
-                        Body.applyForce (Force.newtons 30000)
-                            (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
-                            (Body.originPoint body)
+                maybePlayer =
+                    game.players
+                        |> List.filter (.id >> samePlayerId playerId)
+                        |> List.head
 
-                    else
-                        identity
+                boost =
+                    case ( not dry, maybePlayer ) of
+                        ( True, Just player ) ->
+                            if player.controls.rockets && player.boostTank > 0 then
+                                Body.applyForce (Force.newtons 30000)
+                                    (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
+                                    (Body.originPoint body)
+
+                            else
+                                identity
+
+                        _ ->
+                            identity
 
                 controls =
-                    if dry then
-                        initControls
+                    case ( not dry, maybePlayer ) of
+                        ( True, Just player ) ->
+                            player.controls
 
-                    else
-                        game.player.controls
+                        _ ->
+                            initControls
             in
             simulateCar (Duration.milliseconds tick) game.world controls wheels body
                 |> boost
@@ -630,12 +664,14 @@ initGame config =
     { world =
         initialWorld
             |> World.add (floor config.texture)
-    , player =
-        { driver = Keyboard controlDict
-        , controls = initControls
-        , boostTank = boostSettings.initial
-        , focus = BallCam
-        }
+    , players =
+        [ { id = PlayerId 0
+          , driver = Keyboard controlDict
+          , controls = initControls
+          , boostTank = boostSettings.initial
+          , focus = BallCam
+          }
+        ]
     , lastTick = 0
     , refills =
         Refill.init
@@ -648,6 +684,7 @@ initGame config =
     }
 
 
+initControls : Controls
 initControls =
     { rockets = False
     , steering = 0
@@ -662,7 +699,7 @@ applyJump body =
     -- TODO: raycast to see if on ground
     -- TODO: handle arrow directions
     case (Body.data body).id of
-        Car _ ->
+        Car _ _ ->
             body
                 |> Body.applyForce (Force.newtons 400000)
                     -- TODO: add direction modifier keys
@@ -673,25 +710,45 @@ applyJump body =
             body
 
 
+applyRockets : Player -> Float -> Float
+applyRockets player boostTank =
+    if player.controls.rockets then
+        max 0 (boostTank - 0.5)
+
+    else
+        boostTank
+
+
 subscriptions : Model -> Sub Msg
 subscriptions { screen } =
     case screen of
         Playing game _ ->
             case game.status of
                 Paused _ ->
-                    Sub.batch
-                        [ Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
-                        , Events.onKeyDown (keyDecoder game.player.driver KeyDown)
-                        , Events.onKeyUp (keyDecoder game.player.driver KeyUp)
-                        ]
+                    (Sub.batch << List.concat)
+                        ([ Events.onResize (\w h -> Resize (toFloat w) (toFloat h)) ]
+                            :: List.map
+                                (\player ->
+                                    [ Events.onKeyDown (keyDecoder player.driver (KeyDown player.id))
+                                    , Events.onKeyUp (keyDecoder player.driver (KeyUp player.id))
+                                    ]
+                                )
+                                game.players
+                        )
 
                 _ ->
-                    Sub.batch
-                        [ Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
-                        , Events.onAnimationFrameDelta Tick
-                        , Events.onKeyDown (keyDecoder game.player.driver KeyDown)
-                        , Events.onKeyUp (keyDecoder game.player.driver KeyUp)
-                        ]
+                    (Sub.batch << List.concat)
+                        ([ Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
+                         , Events.onAnimationFrameDelta Tick
+                         ]
+                            :: List.map
+                                (\player ->
+                                    [ Events.onKeyDown (keyDecoder player.driver (KeyDown player.id))
+                                    , Events.onKeyUp (keyDecoder player.driver (KeyUp player.id))
+                                    ]
+                                )
+                                game.players
+                        )
 
         _ ->
             Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
@@ -744,20 +801,37 @@ view model =
                 ]
 
             Playing game _ ->
-                viewGame model.screenSize game
+                -- TODO: loop over (human) players, split screen as needed
+                let
+                    humans =
+                        game.players
+
+                    scoreboard =
+                        Html.div [ Html.Attributes.class "hud-pane hud-top-center hud-score-clock" ]
+                            [ Html.span [ Html.Attributes.class "hud-score hud-score-orange" ] [ Html.text <| String.fromInt game.score.orange ]
+                            , viewClock game.timeLeft
+                            , Html.span [ Html.Attributes.class "hud-score hud-score-blue" ] [ Html.text <| String.fromInt game.score.blue ]
+                            ]
+                in
+                case humans of
+                    [ p1 ] ->
+                        scoreboard :: viewGame model.screenSize p1 game
+
+                    _ ->
+                        [ Html.text ("Too many players: " ++ String.fromInt (List.length humans)) ]
 
             LoadingError error ->
                 [ Html.p [] [ Html.text ("Error: " ++ error) ] ]
         )
 
 
-viewGame : ScreenSize -> Game -> List (Html Msg)
-viewGame { width, height } { world, player, refills, lastTick, score, status, timeLeft } =
+viewGame : ScreenSize -> Player -> Game -> List (Html Msg)
+viewGame { width, height } player { world, refills, lastTick, score, status } =
     let
         car =
             world
                 |> World.bodies
-                |> List.filter (Body.data >> .id >> isCar)
+                |> List.filter (Body.data >> .id >> isPlayersCar player)
                 |> List.head
 
         camera =
@@ -859,7 +933,7 @@ viewGame { width, height } { world, player, refills, lastTick, score, status, ti
                         )
                     |> List.map getTransformedDrawable
                 , case ( car, Maybe.map (Body.data >> .id) car ) of
-                    ( Just car_, Just (Car wheels) ) ->
+                    ( Just car_, Just (Car _ wheels) ) ->
                         renderWheels car_ wheels
 
                     _ ->
@@ -897,11 +971,6 @@ viewGame { width, height } { world, player, refills, lastTick, score, status, ti
         , clipDepth = meters 0.1
         , entities = drawables
         }
-    , Html.div [ Html.Attributes.class "hud-pane hud-top-center hud-score-clock" ]
-        [ Html.span [ Html.Attributes.class "hud-score hud-score-orange" ] [ Html.text <| String.fromInt score.orange ]
-        , viewClock timeLeft
-        , Html.span [ Html.Attributes.class "hud-score hud-score-blue" ] [ Html.text <| String.fromInt score.blue ]
-        ]
     , Html.div [ Html.Attributes.class "hud-pane hud-pane-msg hud-bottom-right" ]
         [ Html.p
             [ Html.Attributes.style "font-size" "48px" ]
@@ -1365,15 +1434,19 @@ applyImpulses dt world frame car wheels sliding wheelFrictions =
 
 rotateWheels : Duration -> Frame3d Meters WorldCoordinates { defines : BodyCoordinates } -> Body Data -> List Wheel -> List Wheel -> Body Data
 rotateWheels dt frame car wheels updatedWheels =
-    case wheels of
-        [] ->
+    case ( wheels, (Body.data car).id ) of
+        ( [], Car playerId _ ) ->
             Body.withData
-                { id = Car (List.reverse updatedWheels)
+                { id = Car playerId (List.reverse updatedWheels)
                 , entity = (Body.data car).entity
                 }
                 car
 
-        wheel :: remainingWheels ->
+        ( [], _ ) ->
+            -- Never should get hit cause `car` should always be a `Car`...
+            car
+
+        ( wheel :: remainingWheels, _ ) ->
             case wheel.contact of
                 Just { point, normal } ->
                     let
@@ -1503,8 +1576,8 @@ computeImpulseDenominator body point normal =
             dot
 
 
-base : Body Data
-base =
+base : PlayerId -> Body Data
+base playerId =
     -- TODO: better car shape
     let
         offset =
@@ -1549,7 +1622,7 @@ base =
             , { defaultWheel | chassisConnectionPoint = Point3d.meters -1 -1 0 }
             ]
     in
-    { id = Car wheels
+    { id = Car playerId wheels
     , entity = entity
     }
         |> Body.block shape
