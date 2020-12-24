@@ -864,6 +864,35 @@ view model =
                             , Html.span [ Html.Attributes.class "hud-score hud-score-blue" ] [ Html.text <| String.fromInt game.score.blue ]
                             ]
 
+                    message =
+                        case game.status of
+                            Preparing _ countdown ->
+                                Html.h1 [ Html.Attributes.class "hud-pane hud-pane-msg center-popup" ]
+                                    [ Html.text (String.fromInt (Basics.ceiling (Duration.inSeconds countdown))) ]
+
+                            Replay _ ->
+                                Html.h1 [ Html.Attributes.class "hud-pane hud-pane-msg center-popup" ] [ Html.text "GOOAAALLLL!!!!!" ]
+
+                            GameOver ->
+                                Html.div [ Html.Attributes.class "hud-pane hud-pane-msg center-popup" ]
+                                    [ Html.h1 []
+                                        [ Html.text
+                                            (if game.score.blue > game.score.orange then
+                                                "Blue wins!!!"
+
+                                             else
+                                                "Orange wins!!!"
+                                            )
+                                        ]
+                                    , Html.div [ Html.Attributes.class "btn-row" ]
+                                        [ Html.button [ Html.Attributes.class "btn-primary", Html.Events.onClick LeaveGame ]
+                                            [ Html.text "Menu" ]
+                                        ]
+                                    ]
+
+                            _ ->
+                                Html.text ""
+
                     commonEntities =
                         List.concat
                             [ game.world
@@ -888,7 +917,7 @@ view model =
                 in
                 case humans of
                     [ p1 ] ->
-                        scoreboard :: viewGame model.screenSize p1 game commonEntities
+                        scoreboard :: viewPlayer model.screenSize p1 game commonEntities
 
                     [ p1, p2 ] ->
                         let
@@ -899,9 +928,10 @@ view model =
                         in
                         scoreboard
                             :: [ Html.div [ Html.Attributes.style "display" "flex" ]
-                                    [ Html.div [] (viewGame screenSize p1 game commonEntities)
-                                    , Html.div [] (viewGame screenSize p2 game commonEntities)
+                                    [ Html.div [ Html.Attributes.style "position" "relative" ] (viewPlayer screenSize p1 game commonEntities)
+                                    , Html.div [ Html.Attributes.style "position" "relative" ] (viewPlayer screenSize p2 game commonEntities)
                                     ]
+                               , message
                                ]
 
                     _ ->
@@ -912,8 +942,8 @@ view model =
         )
 
 
-viewGame : ScreenSize -> Player -> Game -> List (Scene3d.Entity WorldCoordinates) -> List (Html Msg)
-viewGame { width, height } player { world, refills, lastTick, score, status } commonEntities =
+viewPlayer : ScreenSize -> Player -> Game -> List (Scene3d.Entity WorldCoordinates) -> List (Html Msg)
+viewPlayer { width, height } player { world, refills, lastTick, score, status } commonEntities =
     let
         car =
             world
@@ -1064,33 +1094,6 @@ viewGame { width, height } player { world, refills, lastTick, score, status } co
                     [ Html.text "• Ball cam" ]
                 , Html.p []
                     [ Html.text "Press (C) to toggle" ]
-                ]
-
-        _ ->
-            Html.text ""
-    , case status of
-        Preparing _ countdown ->
-            Html.h1 [ Html.Attributes.class "hud-pane hud-pane-msg center-popup" ]
-                [ Html.text (String.fromInt (Basics.ceiling (Duration.inSeconds countdown))) ]
-
-        Replay _ ->
-            Html.h1 [ Html.Attributes.class "hud-pane hud-pane-msg center-popup" ] [ Html.text "GOOAAALLLL!!!!!" ]
-
-        GameOver ->
-            Html.div [ Html.Attributes.class "hud-pane hud-pane-msg center-popup" ]
-                [ Html.h1 []
-                    [ Html.text
-                        (if score.blue > score.orange then
-                            "Blue wins!!!"
-
-                         else
-                            "Orange wins!!!"
-                        )
-                    ]
-                , Html.div [ Html.Attributes.class "btn-row" ]
-                    [ Html.button [ Html.Attributes.class "btn-primary", Html.Events.onClick LeaveGame ]
-                        [ Html.text "Menu" ]
-                    ]
                 ]
 
         _ ->
