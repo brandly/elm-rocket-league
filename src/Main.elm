@@ -291,6 +291,16 @@ type Team
     | Blue
 
 
+teamColor : Team -> Color
+teamColor team =
+    case team of
+        Blue ->
+            Color.rgb255 43 142 228
+
+        Orange ->
+            Color.rgb255 255 165 0
+
+
 type alias Config =
     { texture : Material.Texture Color
     , drivers : List ( Driver, Team )
@@ -1704,13 +1714,7 @@ base player =
 
         material =
             Material.nonmetal
-                { baseColor =
-                    case player.team of
-                        Blue ->
-                            Color.rgb255 43 142 228
-
-                        Orange ->
-                            Color.rgb255 255 165 0
+                { baseColor = teamColor player.team
                 , roughness = 0.5
                 }
 
