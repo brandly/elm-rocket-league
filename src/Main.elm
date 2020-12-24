@@ -1924,7 +1924,7 @@ buildPanel type_ width height =
                 |> Body.translateBy (Vector3d.meters 0 0 (height / 2))
 
         ( slopeRadius, stepCount ) =
-            ( 5, 30 )
+            ( 5, 10 )
 
         bottomSlope =
             List.range 1 (stepCount - 1)
