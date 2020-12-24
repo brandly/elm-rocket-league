@@ -134,6 +134,20 @@ type Driver
     = Keyboard (Dict String Command)
 
 
+defaultKeyboard : Dict String Command
+defaultKeyboard =
+    Dict.fromList
+        [ ( "ArrowLeft", Steer -1 )
+        , ( "ArrowRight", Steer 1 )
+        , ( "ArrowUp", Speed 1 )
+        , ( "ArrowDown", Speed -1 )
+        , ( " ", Jump )
+        , ( "Shift", Rocket )
+        , ( "c", ToggleCam )
+        , ( "p", TogglePause )
+        ]
+
+
 type PlayerId
     = PlayerId Int
 
@@ -263,6 +277,7 @@ type alias Model =
 
 type alias Config =
     { texture : Material.Texture Color
+    , drivers : List Driver
     }
 
 
@@ -423,7 +438,7 @@ update msg model =
             ( { model | screen = Menu config }, Cmd.none )
 
         ( Loading, TextureResponse (Ok texture) ) ->
-            ( { model | screen = Menu { texture = texture } }, Cmd.none )
+            ( { model | screen = Menu { texture = texture, drivers = [ Keyboard defaultKeyboard ] } }, Cmd.none )
 
         ( Loading, TextureResponse (Err err) ) ->
             ( { model
@@ -647,31 +662,20 @@ updateBody dry game tick body =
 
 initGame : Config -> Game
 initGame config =
-    let
-        controlDict : Dict String Command
-        controlDict =
-            Dict.fromList
-                [ ( "ArrowLeft", Steer -1 )
-                , ( "ArrowRight", Steer 1 )
-                , ( "ArrowUp", Speed 1 )
-                , ( "ArrowDown", Speed -1 )
-                , ( " ", Jump )
-                , ( "Shift", Rocket )
-                , ( "c", ToggleCam )
-                , ( "p", TogglePause )
-                ]
-    in
     { world =
         initialWorld
             |> World.add (floor config.texture)
     , players =
-        [ { id = PlayerId 0
-          , driver = Keyboard controlDict
-          , controls = initControls
-          , boostTank = boostSettings.initial
-          , focus = BallCam
-          }
-        ]
+        List.indexedMap
+            (\index driver ->
+                { id = PlayerId index
+                , driver = driver
+                , controls = initControls
+                , boostTank = boostSettings.initial
+                , focus = BallCam
+                }
+            )
+            config.drivers
     , lastTick = 0
     , refills =
         Refill.init
