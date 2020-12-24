@@ -466,6 +466,7 @@ update msg model =
                                         , ( "d", Steer 1 )
                                         , ( "w", Speed 1 )
                                         , ( "s", Speed -1 )
+                                        , ( "r", ToggleCam )
                                         ]
                                     )
                               , Orange
@@ -1099,6 +1100,17 @@ viewPlayer { width, height } player { world, refills, lastTick, score, status } 
         ]
     , case player.focus of
         BallCam ->
+            let
+                toggleCamKey =
+                    case player.driver of
+                        Keyboard controlDict ->
+                            controlDict
+                                |> Dict.toList
+                                |> List.filter (Tuple.second >> (==) ToggleCam)
+                                |> List.head
+                                |> Maybe.map Tuple.first
+                                |> Maybe.withDefault ""
+            in
             Html.div [ Html.Attributes.class "hud-pane-msg hud-bottom-left hud-cam" ]
                 [ Html.p
                     [ Html.Attributes.style "font-size" "24px"
@@ -1106,7 +1118,7 @@ viewPlayer { width, height } player { world, refills, lastTick, score, status } 
                     ]
                     [ Html.text "• Ball cam" ]
                 , Html.p []
-                    [ Html.text "Press (C) to toggle" ]
+                    [ Html.text <| "Press (" ++ toggleCamKey ++ ") to toggle" ]
                 ]
 
         _ ->
