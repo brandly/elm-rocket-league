@@ -130,8 +130,13 @@ type Status
     | GameOver
 
 
+type Driver
+    = Keyboard (Dict String Command)
+
+
 type alias Player =
-    { controls : Controls
+    { driver : Driver
+    , controls : Controls
     , boostTank : Float
     , focus : CameraFocus
     }
@@ -608,11 +613,26 @@ updateBody dry game tick body =
 
 initGame : Config -> Game
 initGame config =
+    let
+        controlDict : Dict String Command
+        controlDict =
+            Dict.fromList
+                [ ( "ArrowLeft", Steer -1 )
+                , ( "ArrowRight", Steer 1 )
+                , ( "ArrowUp", Speed 1 )
+                , ( "ArrowDown", Speed -1 )
+                , ( " ", Jump )
+                , ( "Shift", Rocket )
+                , ( "c", ToggleCam )
+                , ( "p", TogglePause )
+                ]
+    in
     { world =
         initialWorld
             |> World.add (floor config.texture)
     , player =
-        { controls = initControls
+        { driver = Keyboard controlDict
+        , controls = initControls
         , boostTank = boostSettings.initial
         , focus = BallCam
         }
@@ -661,38 +681,24 @@ subscriptions { screen } =
                 Paused _ ->
                     Sub.batch
                         [ Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
-                        , Events.onKeyDown (keyDecoder KeyDown)
-                        , Events.onKeyUp (keyDecoder KeyUp)
+                        , Events.onKeyDown (keyDecoder game.player.driver KeyDown)
+                        , Events.onKeyUp (keyDecoder game.player.driver KeyUp)
                         ]
 
                 _ ->
                     Sub.batch
                         [ Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
                         , Events.onAnimationFrameDelta Tick
-                        , Events.onKeyDown (keyDecoder KeyDown)
-                        , Events.onKeyUp (keyDecoder KeyUp)
+                        , Events.onKeyDown (keyDecoder game.player.driver KeyDown)
+                        , Events.onKeyUp (keyDecoder game.player.driver KeyUp)
                         ]
 
         _ ->
             Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
 
 
-controlDict : Dict String Command
-controlDict =
-    Dict.fromList
-        [ ( "ArrowLeft", Steer -1 )
-        , ( "ArrowRight", Steer 1 )
-        , ( "ArrowUp", Speed 1 )
-        , ( "ArrowDown", Speed -1 )
-        , ( " ", Jump )
-        , ( "Shift", Rocket )
-        , ( "c", ToggleCam )
-        , ( "p", TogglePause )
-        ]
-
-
-keyDecoder : (Command -> Msg) -> Json.Decode.Decoder Msg
-keyDecoder toMsg =
+keyDecoder : Driver -> (Command -> Msg) -> Json.Decode.Decoder Msg
+keyDecoder (Keyboard controlDict) toMsg =
     Json.Decode.field "key" Json.Decode.string
         |> Json.Decode.andThen
             (\string ->
