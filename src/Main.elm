@@ -396,6 +396,10 @@ init _ =
     )
 
 
+simulationStep =
+    Duration.seconds (1 / 60)
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
@@ -594,7 +598,7 @@ updateGame config tick game =
                     | world =
                         game.world
                             |> World.update (updateBody False game tick)
-                            |> World.simulate (Duration.milliseconds tick)
+                            |> World.simulate simulationStep
                     , lastTick = currentTick
                 }
 
@@ -613,7 +617,7 @@ updateGame config tick game =
                     | world =
                         game.world
                             |> World.update (updateBody True game tick)
-                            |> World.simulate (Duration.milliseconds tick)
+                            |> World.simulate simulationStep
                     , status =
                         Preparing hasCar
                             (Quantity.minus (Duration.milliseconds tick) countdown)
@@ -708,7 +712,7 @@ updateGame config tick game =
                 | world =
                     game.world
                         |> World.update (updateBody False game tick)
-                        |> World.simulate (Duration.milliseconds tick)
+                        |> World.simulate simulationStep
                 , players =
                     List.map
                         (\( player, carPoint ) ->
@@ -774,7 +778,7 @@ updateBody dry game tick body =
                         _ ->
                             initControls
             in
-            simulateCar (Duration.milliseconds tick) game.world controls wheels body
+            simulateCar simulationStep game.world controls wheels body
                 |> boost
 
         _ ->
