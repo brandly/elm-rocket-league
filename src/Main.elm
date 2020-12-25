@@ -1819,16 +1819,7 @@ base player =
     -- TODO: better car shape
     let
         offset =
-            let
-                x =
-                    case player.team of
-                        Blue ->
-                            -35
-
-                        Orange ->
-                            35
-            in
-            Point3d.meters x 0 1.1
+            Point3d.meters -35 0 1.1
 
         size =
             ( Length.meters 2.8, Length.meters 2, Length.meters 0.5 )
@@ -1875,6 +1866,14 @@ base player =
         |> Body.block shape
         |> Body.withBehavior (Body.dynamic (Mass.kilograms 1190))
         |> Body.moveTo offset
+        |> (\body ->
+                case player.team of
+                    Orange ->
+                        Body.rotateAround Axis3d.z (Angle.degrees 180) body
+
+                    _ ->
+                        body
+           )
 
 
 ballSettings =
