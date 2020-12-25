@@ -1,6 +1,6 @@
 :root {
   --blue: #2b8ee4;
-  --orange: orange;
+  --orange: #ffa500;
 }
 
 
@@ -24,13 +24,13 @@ p {
 }
 
 .hud-bottom-left {
-  position: fixed;
+  position: absolute;
   bottom: 12px;
   left: 24px;
 }
 
 .hud-bottom-right {
-  position: fixed;
+  position: absolute;
   bottom: 12px;
   right: 24px;
   text-align: right;
@@ -93,6 +93,9 @@ p {
   justify-content: space-between;
   margin: 6px 0;
   font-size: 14px;
+}
+.controls-row:hover {
+  background-color: #fafafa;
 }
 
 .btn-row {
