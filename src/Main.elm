@@ -162,20 +162,6 @@ twoPlayerDrivers : List ( Driver, Team )
 twoPlayerDrivers =
     [ ( Keyboard
             (Dict.fromList
-                [ ( "ArrowLeft", Steer -1 )
-                , ( "ArrowRight", Steer 1 )
-                , ( "ArrowUp", Speed 1 )
-                , ( "ArrowDown", Speed -1 )
-                , ( ",", Jump )
-                , ( "m", Rocket )
-                , ( ".", ToggleCam )
-                , ( "p", TogglePause )
-                ]
-            )
-      , Blue
-      )
-    , ( Keyboard
-            (Dict.fromList
                 [ ( "a", Steer -1 )
                 , ( "d", Steer 1 )
                 , ( "w", Speed 1 )
@@ -187,6 +173,20 @@ twoPlayerDrivers =
                 ]
             )
       , Orange
+      )
+    , ( Keyboard
+            (Dict.fromList
+                [ ( "ArrowLeft", Steer -1 )
+                , ( "ArrowRight", Steer 1 )
+                , ( "ArrowUp", Speed 1 )
+                , ( "ArrowDown", Speed -1 )
+                , ( ",", Jump )
+                , ( "m", Rocket )
+                , ( ".", ToggleCam )
+                , ( "p", TogglePause )
+                ]
+            )
+      , Blue
       )
     ]
 
