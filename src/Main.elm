@@ -158,6 +158,39 @@ defaultKeyboard =
         ]
 
 
+twoPlayerDrivers : List ( Driver, Team )
+twoPlayerDrivers =
+    [ ( Keyboard
+            (Dict.fromList
+                [ ( "ArrowLeft", Steer -1 )
+                , ( "ArrowRight", Steer 1 )
+                , ( "ArrowUp", Speed 1 )
+                , ( "ArrowDown", Speed -1 )
+                , ( ",", Jump )
+                , ( "m", Rocket )
+                , ( ".", ToggleCam )
+                , ( "p", TogglePause )
+                ]
+            )
+      , Blue
+      )
+    , ( Keyboard
+            (Dict.fromList
+                [ ( "a", Steer -1 )
+                , ( "d", Steer 1 )
+                , ( "w", Speed 1 )
+                , ( "s", Speed -1 )
+                , ( "z", Jump )
+                , ( "Shift", Rocket )
+                , ( "e", ToggleCam )
+                , ( "p", TogglePause )
+                ]
+            )
+      , Orange
+      )
+    ]
+
+
 type PlayerId
     = PlayerId Int
 
@@ -211,6 +244,7 @@ refillSize refill =
 type Msg
     = Tick Float
     | Resize Float Float
+    | SetDrivers (List ( Driver, Team ))
     | StartGame
     | LeaveGame
     | KeyDown PlayerId Command
@@ -225,6 +259,41 @@ type Command
     | Speed Float
     | ToggleCam
     | TogglePause
+
+
+commandToString cmd =
+    case cmd of
+        Jump ->
+            "Jump"
+
+        Rocket ->
+            "Rocket"
+
+        Steer dir ->
+            if dir == -1 then
+                "Turn Left"
+
+            else if dir == 1 then
+                "Turn Right"
+
+            else
+                "shrug"
+
+        Speed dir ->
+            if dir == -1 then
+                "Brake"
+
+            else if dir == 1 then
+                "Gas"
+
+            else
+                "shrug"
+
+        ToggleCam ->
+            "Toggle Camera"
+
+        TogglePause ->
+            "Pause"
 
 
 type alias CarSettings =
@@ -367,6 +436,9 @@ update msg model =
             , Cmd.none
             )
 
+        ( Menu config, SetDrivers drivers ) ->
+            ( { model | screen = Menu { config | drivers = drivers } }, Cmd.none )
+
         ( Menu config, StartGame ) ->
             ( { model | screen = Playing (initGame config) config }, Cmd.none )
 
@@ -382,7 +454,7 @@ update msg model =
         ( Playing game _, KeyDown playerId cmd ) ->
             case cmd of
                 Jump ->
-                    ( mapGame (\g -> { g | world = World.update applyJump g.world })
+                    ( mapGame (\g -> { g | world = World.update (applyJump playerId) g.world })
                     , Cmd.none
                     )
 
@@ -457,6 +529,9 @@ update msg model =
         ( Playing _ _, TextureResponse _ ) ->
             ( model, Cmd.none )
 
+        ( Playing _ _, SetDrivers _ ) ->
+            ( model, Cmd.none )
+
         ( Playing _ _, StartGame ) ->
             ( model, Cmd.none )
 
@@ -468,20 +543,7 @@ update msg model =
                 | screen =
                     Menu
                         { texture = texture
-                        , drivers =
-                            [ ( Keyboard defaultKeyboard, Blue )
-                            , ( Keyboard
-                                    (Dict.fromList
-                                        [ ( "a", Steer -1 )
-                                        , ( "d", Steer 1 )
-                                        , ( "w", Speed 1 )
-                                        , ( "s", Speed -1 )
-                                        , ( "r", ToggleCam )
-                                        ]
-                                    )
-                              , Orange
-                              )
-                            ]
+                        , drivers = [ ( Keyboard defaultKeyboard, Blue ) ]
                         }
               }
             , Cmd.none
@@ -757,18 +819,22 @@ initControls =
     }
 
 
-applyJump : Body Data -> Body Data
-applyJump body =
+applyJump : PlayerId -> Body Data -> Body Data
+applyJump playerId body =
     -- TODO: restrict to double jump
     -- TODO: raycast to see if on ground
     -- TODO: handle arrow directions
     case (Body.data body).id of
-        Car _ _ ->
-            body
-                |> Body.applyForce (Force.newtons 400000)
-                    -- TODO: add direction modifier keys
-                    (body |> Body.frame >> Frame3d.zDirection)
-                    (Body.originPoint body)
+        Car carPlayerId _ ->
+            if playerId == carPlayerId then
+                body
+                    |> Body.applyForce (Force.newtons 400000)
+                        -- TODO: add direction modifier keys
+                        (body |> Body.frame >> Frame3d.zDirection)
+                        (Body.originPoint body)
+
+            else
+                body
 
         _ ->
             body
@@ -842,18 +908,53 @@ view model =
             Loading ->
                 [ Html.p [ Html.Attributes.class "center-popup" ] [ Html.text "Loading..." ] ]
 
-            Menu _ ->
-                [ Html.div [ Html.Attributes.class "center-popup" ]
+            Menu config ->
+                [ Html.div [ Html.Attributes.class "center-popup", Html.Attributes.style "width" "420px" ]
                     [ Html.h1 [] [ Html.text "Rocket League" ]
-                    , Html.div []
-                        (List.map
-                            (\( action, key ) ->
-                                Html.div [ Html.Attributes.class "controls-row" ]
-                                    [ Html.span [] [ Html.text action ]
-                                    , Html.span [] [ Html.text key ]
-                                    ]
-                            )
-                            controls
+                    , Html.div [ Html.Attributes.style "display" "flex", Html.Attributes.style "justify-content" "space-between" ]
+                        [ radio
+                            { group = "mode"
+                            , value = "1p"
+                            , label = "One Player"
+                            , checked = List.length config.drivers == 1
+                            , onCheck = \_ -> SetDrivers [ ( Keyboard defaultKeyboard, Blue ) ]
+                            }
+                        , radio
+                            { group = "mode"
+                            , value = "2p"
+                            , label = "Two Player"
+                            , checked = List.length config.drivers == 2
+                            , onCheck = \_ -> SetDrivers twoPlayerDrivers
+                            }
+                        ]
+                    , Html.div [ Html.Attributes.style "display" "flex" ]
+                        (config.drivers
+                            |> List.indexedMap
+                                (\index ( driver, team ) ->
+                                    case driver of
+                                        Keyboard controlDict ->
+                                            Html.div [ Html.Attributes.style "flex-grow" "1", Html.Attributes.style "padding" "0 12px" ]
+                                                (Html.h3 [ Html.Attributes.style "margin" "12px 0 8px" ] [ Html.text (String.fromInt (index + 1) ++ "p controls") ]
+                                                    :: (controlDict
+                                                            |> Dict.toList
+                                                            |> List.map
+                                                                (\( key, command ) ->
+                                                                    Html.div [ Html.Attributes.class "controls-row" ]
+                                                                        [ Html.span []
+                                                                            [ Html.text
+                                                                                (if key == " " then
+                                                                                    "Spacebar"
+
+                                                                                 else
+                                                                                    key
+                                                                                )
+                                                                            ]
+                                                                        , Html.span [] [ Html.text (commandToString command) ]
+                                                                        ]
+                                                                )
+                                                       )
+                                                )
+                                )
                         )
                     , Html.div [ Html.Attributes.class "btn-row" ]
                         [ Html.button [ Html.Events.onClick StartGame, Html.Attributes.class "btn-primary" ]
@@ -964,6 +1065,25 @@ view model =
             LoadingError error ->
                 [ Html.p [] [ Html.text ("Error: " ++ error) ] ]
         )
+
+
+radio { group, value, label, checked, onCheck } =
+    let
+        id =
+            String.join "-" [ group, value ]
+    in
+    Html.div []
+        [ Html.label [ Html.Attributes.for id ] [ Html.text label ]
+        , Html.input
+            [ Html.Attributes.type_ "radio"
+            , Html.Attributes.id id
+            , Html.Attributes.name group
+            , Html.Attributes.value value
+            , Html.Attributes.checked checked
+            , Html.Events.onCheck onCheck
+            ]
+            []
+        ]
 
 
 viewPlayer : ScreenSize -> Player -> Game -> List (Scene3d.Entity WorldCoordinates) -> List (Html Msg)
@@ -1128,7 +1248,7 @@ viewPlayer { width, height } player { world, refills, lastTick, score, status } 
                     ]
                     [ Html.text "• Ball cam" ]
                 , Html.p []
-                    [ Html.text <| "Press (" ++ toggleCamKey ++ ") to toggle" ]
+                    [ Html.text <| "Press [" ++ toggleCamKey ++ "] to toggle" ]
                 ]
 
         _ ->

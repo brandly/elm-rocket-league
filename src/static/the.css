@@ -94,6 +94,9 @@ p {
   margin: 6px 0;
   font-size: 14px;
 }
+.controls-row:hover {
+  background-color: #fafafa;
+}
 
 .btn-row {
   display: flex;
