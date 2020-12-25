@@ -169,7 +169,6 @@ twoPlayerDrivers =
                 , ( "z", Jump )
                 , ( "Shift", Rocket )
                 , ( "e", ToggleCam )
-                , ( "p", TogglePause )
                 ]
             )
       , Orange
