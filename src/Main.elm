@@ -603,7 +603,7 @@ updateGame config tick game =
             if Duration.inSeconds countdown <= 0 then
                 { game | status = Live }
 
-            else if not hasCar && tick < 40 then
+            else if not hasCar && currentTick > 500 then
                 { game
                     | world = List.foldl (\p w -> World.add (base p) w) game.world game.players
                     , status = Preparing True countdown
@@ -618,6 +618,7 @@ updateGame config tick game =
                     , status =
                         Preparing hasCar
                             (Quantity.minus (Duration.milliseconds tick) countdown)
+                    , lastTick = currentTick
                 }
 
         GameOver ->
