@@ -154,7 +154,6 @@ defaultKeyboard =
         , ( " ", Jump )
         , ( "Shift", Rocket )
         , ( "c", ToggleCam )
-        , ( "p", TogglePause )
         ]
 
 
@@ -182,7 +181,6 @@ twoPlayerDrivers =
                 , ( ",", Jump )
                 , ( "m", Rocket )
                 , ( ".", ToggleCam )
-                , ( "p", TogglePause )
                 ]
             )
       , Blue
@@ -860,6 +858,19 @@ subscriptions { screen } =
             , Events.onKeyUp (keyDecoder player.driver (KeyUp player.id))
             ]
 
+        pauseKey =
+            Events.onKeyDown
+                (Json.Decode.field "key" Json.Decode.string
+                    |> Json.Decode.andThen
+                        (\string ->
+                            if string == "p" then
+                                Json.Decode.succeed (KeyDown (PlayerId -1) TogglePause)
+
+                            else
+                                Json.Decode.fail ("Unrecognized key: " ++ string)
+                        )
+                )
+
         resize =
             Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
     in
@@ -868,7 +879,7 @@ subscriptions { screen } =
             case game.status of
                 Paused _ ->
                     (Sub.batch << List.concat)
-                        ([ resize ]
+                        ([ resize, pauseKey ]
                             :: List.map playerEvents
                                 game.players
                         )
@@ -876,6 +887,7 @@ subscriptions { screen } =
                 _ ->
                     (Sub.batch << List.concat)
                         ([ resize
+                         , pauseKey
                          , Events.onAnimationFrameDelta Tick
                          ]
                             :: List.map playerEvents game.players
