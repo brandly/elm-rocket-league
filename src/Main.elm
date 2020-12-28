@@ -376,7 +376,7 @@ type alias Config =
 type Screen
     = Loading
     | LoadingError String
-    | Menu Config
+    | Menu (World Data) Config
     | Playing Game Config
 
 
@@ -437,13 +437,16 @@ update msg model =
             , Cmd.none
             )
 
-        ( Menu config, SetDrivers drivers ) ->
-            ( { model | screen = Menu { config | drivers = drivers } }, Cmd.none )
+        ( Menu world config, SetDrivers drivers ) ->
+            ( { model | screen = Menu world { config | drivers = drivers } }, Cmd.none )
 
-        ( Menu config, StartGame ) ->
+        ( Menu _ config, StartGame ) ->
             ( { model | screen = Playing (initGame config) config }, Cmd.none )
 
-        ( Menu _, _ ) ->
+        ( Menu world config, Tick tick ) ->
+            ( { model | screen = Menu (world |> World.simulate simulationStep) config }, Cmd.none )
+
+        ( Menu _ _, _ ) ->
             ( model, Cmd.none )
 
         ( Playing game config, Tick tick ) ->
@@ -537,12 +540,12 @@ update msg model =
             ( model, Cmd.none )
 
         ( Playing _ config, LeaveGame ) ->
-            ( { model | screen = Menu config }, Cmd.none )
+            ( { model | screen = Menu (initialWorld |> World.add (floor config.texture)) config }, Cmd.none )
 
         ( Loading, TextureResponse (Ok texture) ) ->
             ( { model
                 | screen =
-                    Menu
+                    Menu (initialWorld |> World.add (floor texture))
                         { texture = texture
                         , drivers = [ ( Keyboard defaultKeyboard, Blue ) ]
                         }
@@ -876,6 +879,12 @@ subscriptions { screen } =
             Events.onResize (\w h -> Resize (toFloat w) (toFloat h))
     in
     case screen of
+        Menu _ _ ->
+            Sub.batch
+                [ Events.onAnimationFrameDelta Tick
+                , resize
+                ]
+
         Playing game _ ->
             case game.status of
                 Paused _ ->
@@ -924,24 +933,55 @@ view model =
             Loading ->
                 [ Html.p [ Html.Attributes.class "center-popup" ] [ Html.text "Loading..." ] ]
 
-            Menu config ->
-                [ Html.div [ Html.Attributes.class "center-popup", Html.Attributes.style "width" "420px" ]
-                    [ Html.h1 [] [ Html.text "Rocket League" ]
-                    , Html.div [ Html.Attributes.style "display" "flex", Html.Attributes.style "justify-content" "space-between" ]
-                        [ radio
-                            { group = "mode"
-                            , value = "1p"
-                            , label = "One Player"
-                            , checked = List.length config.drivers == 1
-                            , onCheck = \_ -> SetDrivers [ ( Keyboard defaultKeyboard, Blue ) ]
+            Menu world config ->
+                let
+                    { width, height } =
+                        model.screenSize
+                in
+                [ Scene3d.custom
+                    { dimensions = ( pixels (Basics.floor width), pixels (Basics.floor height) )
+                    , antialiasing = Scene3d.multisampling
+                    , camera =
+                        Camera3d.perspective
+                            { viewpoint =
+                                Viewpoint3d.lookAt
+                                    { eyePoint = Point3d.meters 30 -5 5
+                                    , focalPoint = Point3d.meters 0 5 5
+                                    , upDirection = Direction3d.positiveZ
+                                    }
+                            , verticalFieldOfView = Angle.degrees 24
                             }
-                        , radio
-                            { group = "mode"
-                            , value = "2p"
-                            , label = "Two Player"
-                            , checked = List.length config.drivers == 2
-                            , onCheck = \_ -> SetDrivers twoPlayerDrivers
-                            }
+                    , lights = Scene3d.twoLights sunlight daylight
+                    , exposure = Scene3d.maxLuminance (Luminance.nits 10000)
+                    , toneMapping = Scene3d.noToneMapping
+                    , whiteBalance = Light.daylight
+                    , background = Scene3d.transparentBackground
+                    , clipDepth = meters 0.1
+                    , entities = world |> World.bodies |> List.map getTransformedDrawable
+                    }
+                , Html.div [ Html.Attributes.class "menu" ]
+                    [ Html.div []
+                        [ Html.h1 [] [ Html.text "Rocket League" ]
+                        , Html.div []
+                            [ radio
+                                { group = "mode"
+                                , value = "1p"
+                                , label = "One Player"
+                                , checked = List.length config.drivers == 1
+                                , onCheck = \_ -> SetDrivers [ ( Keyboard defaultKeyboard, Blue ) ]
+                                }
+                            , radio
+                                { group = "mode"
+                                , value = "2p"
+                                , label = "Two Player"
+                                , checked = List.length config.drivers == 2
+                                , onCheck = \_ -> SetDrivers twoPlayerDrivers
+                                }
+                            ]
+                        , Html.div [ Html.Attributes.class "btn-row" ]
+                            [ Html.button [ Html.Events.onClick StartGame, Html.Attributes.class "btn-primary" ]
+                                [ Html.text "Let's go!" ]
+                            ]
                         ]
                     , Html.div [ Html.Attributes.style "display" "flex" ]
                         (config.drivers
@@ -949,7 +989,11 @@ view model =
                                 (\index ( driver, team ) ->
                                     case driver of
                                         Keyboard controlDict ->
-                                            Html.div [ Html.Attributes.style "flex-grow" "1", Html.Attributes.style "padding" "0 12px" ]
+                                            Html.div
+                                                [ Html.Attributes.style "flex-grow" "1"
+                                                , Html.Attributes.style "padding" "0 12px"
+                                                , Html.Attributes.style "min-width" "180px"
+                                                ]
                                                 (Html.h3 [ Html.Attributes.style "margin" "12px 0 8px" ] [ Html.text (String.fromInt (index + 1) ++ "p controls") ]
                                                     :: (controlDict
                                                             |> Dict.toList
@@ -972,10 +1016,6 @@ view model =
                                                 )
                                 )
                         )
-                    , Html.div [ Html.Attributes.class "btn-row" ]
-                        [ Html.button [ Html.Events.onClick StartGame, Html.Attributes.class "btn-primary" ]
-                            [ Html.text "Let's go!" ]
-                        ]
                     ]
                 ]
 
@@ -1088,9 +1128,8 @@ radio { group, value, label, checked, onCheck } =
         id =
             String.join "-" [ group, value ]
     in
-    Html.div []
-        [ Html.label [ Html.Attributes.for id ] [ Html.text label ]
-        , Html.input
+    Html.div [ Html.Attributes.style "padding" "4px 0" ]
+        [ Html.input
             [ Html.Attributes.type_ "radio"
             , Html.Attributes.id id
             , Html.Attributes.name group
@@ -1099,6 +1138,7 @@ radio { group, value, label, checked, onCheck } =
             , Html.Events.onCheck onCheck
             ]
             []
+        , Html.label [ Html.Attributes.for id ] [ Html.text label ]
         ]
 
 
@@ -1210,20 +1250,6 @@ viewPlayer { width, height } player { world, refills, lastTick, score, status } 
                             )
                         |> List.map getTransformedDrawable
                    )
-
-        sunlight =
-            Light.directional (Light.castsShadows True)
-                { chromaticity = Light.sunlight
-                , intensity = Illuminance.lux 10000
-                , direction = Direction3d.xyZ (Angle.degrees 45) (Angle.degrees -60)
-                }
-
-        daylight =
-            Light.overhead
-                { upDirection = Direction3d.z
-                , chromaticity = Light.daylight
-                , intensity = Illuminance.lux 15000
-                }
     in
     [ Scene3d.custom
         { dimensions = ( pixels (Basics.floor width), pixels (Basics.floor height) )
@@ -1270,6 +1296,22 @@ viewPlayer { width, height } player { world, refills, lastTick, score, status } 
         _ ->
             Html.text ""
     ]
+
+
+sunlight =
+    Light.directional (Light.castsShadows True)
+        { chromaticity = Light.sunlight
+        , intensity = Illuminance.lux 10000
+        , direction = Direction3d.xyZ (Angle.degrees 45) (Angle.degrees -60)
+        }
+
+
+daylight =
+    Light.overhead
+        { upDirection = Direction3d.z
+        , chromaticity = Light.daylight
+        , intensity = Illuminance.lux 15000
+        }
 
 
 viewClock : Duration -> Html Msg
