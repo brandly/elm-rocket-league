@@ -1,9 +1,28 @@
+html {
+  box-sizing: border-box;
+}
+*, *:before, *:after {
+  box-sizing: inherit;
+}
+
+:root {
+  --blue: #2b8ee4;
+  --orange: #ffa500;
+}
+
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  background: #666;
 }
 
 p {
   margin: 4px 0;
+}
+
+h1 {
+  font-size: 48px;
+  margin: 8px 0;
 }
 
 .container {
@@ -12,20 +31,31 @@ p {
   top: 0;
 }
 
+.menu {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 24px;
+  color: #fff;
+  text-shadow: -2px 2px 2px rgb(0 0 0 / 50%);
+  display: flex;
+  justify-content: space-between;
+  width: 100vw;
+}
+
 .hud-pane {
-  padding: 6px 12px;
-  border-radius: 4px;
-  background-color: rgba(255,255,255, 0.5);
+  background-color: rgba(0,0,0, 0.5);
+  color: #FFF;
 }
 
 .hud-bottom-left {
-  position: fixed;
+  position: absolute;
   bottom: 12px;
   left: 24px;
 }
 
 .hud-bottom-right {
-  position: fixed;
+  position: absolute;
   bottom: 12px;
   right: 24px;
   text-align: right;
@@ -36,6 +66,42 @@ p {
   top: 24px;
   left: 50%;
   transform: translateX(-50%);
+  display: flex;
+}
+
+.hud-score-clock {
+  font-size: 48px;
+  border-radius: 8px;
+}
+.hud-score-clock > span {
+  text-align: center;
+  border-radius: 8px;
+}
+.hud-clock {
+  min-width: 120px;
+}
+.hud-score {
+  min-width: 60px;
+}
+.hud-score-orange {
+  background: var(--orange);
+}
+.hud-score-blue {
+  background: var(--blue);
+}
+
+.hud-pane-msg {
+  padding: 6px 12px;
+  border-radius: 4px;
+  /* TODO: bounce */
+}
+
+.hud-cam {
+  text-transform: uppercase;
+  color: #FFF;
+}
+.hud-cam-indicator {
+  color: red;
 }
 
 .center-popup {
@@ -45,4 +111,28 @@ p {
   transform: translate(-50%, -50%);
   max-height: 90vh;
   overflow-y: auto;
+}
+
+.controls-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 0;
+  font-size: 14px;
+}
+
+.btn-row {
+  display: flex;
+  margin: 16px 0;
+}
+
+.btn-primary {
+  cursor: pointer;
+  border: none;
+  margin: 0;
+  padding: 12px 18px;
+  border-radius: 4px;
+  background: var(--blue);
+  color: #FFF;
+  font-weight: bold;
+  font-size: 16px;
 }
