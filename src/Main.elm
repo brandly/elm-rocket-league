@@ -441,13 +441,27 @@ update msg model =
             )
 
         ( Menu world config, SetDrivers drivers ) ->
-            ( { model | screen = Menu world { config | drivers = drivers } }, Cmd.none )
+            let
+                config_ =
+                    { config | drivers = drivers }
+            in
+            ( { model | screen = Menu (createMenuWorld config_) config_ }, Cmd.none )
 
         ( Menu _ config, StartGame ) ->
             ( { model | screen = Playing (initGame config) config }, Cmd.none )
 
         ( Menu world config, Tick _ ) ->
-            ( { model | screen = Menu (world |> World.simulate simulationStep) config }, Cmd.none )
+            ( { model
+                | screen =
+                    Menu
+                        (world
+                            |> World.update (updateBody False (List.indexedMap toPlayer config.drivers) world)
+                            |> World.simulate simulationStep
+                        )
+                        config
+              }
+            , Cmd.none
+            )
 
         ( Menu _ _, _ ) ->
             ( model, Cmd.none )
@@ -543,16 +557,16 @@ update msg model =
             ( model, Cmd.none )
 
         ( Playing _ config, LeaveGame ) ->
-            ( { model | screen = Menu (initialWorld |> World.add (floor config.texture)) config }, Cmd.none )
+            ( { model | screen = Menu (createMenuWorld config) config }, Cmd.none )
 
         ( Loading, TextureResponse (Ok texture) ) ->
-            ( { model
-                | screen =
-                    Menu (initialWorld |> World.add (floor texture))
-                        { texture = texture
-                        , drivers = [ ( Keyboard defaultKeyboard, Blue ) ]
-                        }
-              }
+            let
+                config =
+                    { texture = texture
+                    , drivers = [ ( Keyboard defaultKeyboard, Blue ) ]
+                    }
+            in
+            ( { model | screen = Menu (createMenuWorld config) config }
             , Cmd.none
             )
 
@@ -600,7 +614,7 @@ updateGame config tick game =
                 { game
                     | world =
                         game.world
-                            |> World.update (updateBody False game)
+                            |> World.update (updateBody False game.players game.world)
                             |> World.simulate simulationStep
                     , lastTick = currentTick
                 }
@@ -611,7 +625,25 @@ updateGame config tick game =
 
             else if not hasCar && currentTick > 500 then
                 { game
-                    | world = List.foldl (\p w -> World.add (base p) w) game.world game.players
+                    | world =
+                        List.foldl
+                            (\player world ->
+                                World.add
+                                    (createCar player
+                                        |> Body.moveTo (Point3d.meters -35 0 1.1)
+                                        |> (\body ->
+                                                case player.team of
+                                                    Orange ->
+                                                        Body.rotateAround Axis3d.z (Angle.degrees 180) body
+
+                                                    _ ->
+                                                        body
+                                           )
+                                    )
+                                    world
+                            )
+                            game.world
+                            game.players
                     , status = Preparing True countdown
                 }
 
@@ -619,7 +651,7 @@ updateGame config tick game =
                 { game
                     | world =
                         game.world
-                            |> World.update (updateBody True game)
+                            |> World.update (updateBody True game.players game.world)
                             |> World.simulate simulationStep
                     , status =
                         Preparing hasCar
@@ -715,7 +747,7 @@ updateGame config tick game =
             { game
                 | world =
                     game.world
-                        |> World.update (updateBody False game)
+                        |> World.update (updateBody False game.players game.world)
                         |> World.simulate simulationStep
                 , players =
                     List.map
@@ -750,20 +782,20 @@ updateGame config tick game =
             }
 
 
-updateBody : Bool -> Game -> Body Data -> Body Data
-updateBody dry game body =
+updateBody : Bool -> List Player -> World Data -> Body Data -> Body Data
+updateBody dry players world body =
     case (Body.data body).id of
         Car playerId wheels ->
             let
                 maybePlayer =
-                    game.players
+                    players
                         |> List.filter (.id >> samePlayerId playerId)
                         |> List.head
 
                 boost =
-                    case ( not dry, maybePlayer ) of
-                        ( True, Just player ) ->
-                            if player.controls.rockets && player.boostTank > 0 then
+                    case maybePlayer of
+                        Just player ->
+                            if controls.rockets && player.boostTank > 0 then
                                 Body.applyForce (Force.newtons 30000)
                                     (Direction3d.placeIn (Body.frame body) carSettings.forwardDirection)
                                     (Body.originPoint body)
@@ -782,11 +814,23 @@ updateBody dry game body =
                         _ ->
                             initControls
             in
-            simulateCar simulationStep game.world controls wheels body
+            simulateCar simulationStep world controls wheels body
                 |> boost
 
         _ ->
             body
+
+
+toPlayer : Int -> ( Driver, Team ) -> Player
+toPlayer =
+    \index ( driver, team ) ->
+        { id = PlayerId index
+        , team = team
+        , driver = driver
+        , controls = initControls
+        , boostTank = boostSettings.initial
+        , focus = BallCam
+        }
 
 
 initGame : Config -> Game
@@ -794,18 +838,7 @@ initGame config =
     { world =
         initialWorld
             |> World.add (floor config.texture)
-    , players =
-        List.indexedMap
-            (\index ( driver, team ) ->
-                { id = PlayerId index
-                , team = team
-                , driver = driver
-                , controls = initControls
-                , boostTank = boostSettings.initial
-                , focus = BallCam
-                }
-            )
-            config.drivers
+    , players = List.indexedMap toPlayer config.drivers
     , lastTick = 0
     , refills =
         Refill.init
@@ -932,6 +965,21 @@ view model =
                 let
                     { width, height } =
                         model.screenSize
+
+                    wheelEntities =
+                        world
+                            |> World.bodies
+                            |> List.filter (Body.data >> .id >> isCar)
+                            |> List.map
+                                (\car_ ->
+                                    case (Body.data >> .id) car_ of
+                                        Car _ wheels ->
+                                            renderWheels car_ wheels
+
+                                        _ ->
+                                            []
+                                )
+                            |> List.concat
                 in
                 [ Scene3d.custom
                     { dimensions = ( pixels (Basics.floor width), pixels (Basics.floor height) )
@@ -952,7 +1000,11 @@ view model =
                     , whiteBalance = Light.daylight
                     , background = Scene3d.transparentBackground
                     , clipDepth = meters 0.1
-                    , entities = world |> World.bodies |> List.map getTransformedDrawable
+                    , entities =
+                        world
+                            |> World.bodies
+                            |> List.map getTransformedDrawable
+                            |> (++) wheelEntities
                     }
                 , Html.div [ Html.Attributes.class "menu" ]
                     [ Html.div []
@@ -1401,6 +1453,35 @@ initialWorld =
         |> (\world -> List.foldl World.add world panels)
         |> World.add ceiling
         |> World.add ball
+
+
+createMenuWorld : Config -> World Data
+createMenuWorld config =
+    let
+        world_ =
+            initialWorld
+                |> World.add (floor config.texture)
+
+        players =
+            List.indexedMap toPlayer config.drivers
+    in
+    List.foldl
+        (\player world ->
+            case player.id of
+                PlayerId int ->
+                    let
+                        offset =
+                            6 + (toFloat int * 4)
+                    in
+                    World.add
+                        (createCar player
+                            |> Body.moveTo (Point3d.meters -6 offset 3)
+                            |> Body.rotateAround Axis3d.z (Angle.degrees -45)
+                        )
+                        world
+        )
+        world_
+        players
 
 
 simulateCar : Duration -> World Data -> Controls -> List Wheel -> Body Data -> Body Data
@@ -1875,13 +1956,10 @@ computeImpulseDenominator body point normal =
             dot
 
 
-base : Player -> Body Data
-base player =
+createCar : Player -> Body Data
+createCar player =
     -- TODO: better car shape
     let
-        offset =
-            Point3d.meters -35 0 1.1
-
         size =
             ( Length.meters 2.8, Length.meters 2, Length.meters 0.5 )
 
@@ -1926,15 +2004,6 @@ base player =
     }
         |> Body.block shape
         |> Body.withBehavior (Body.dynamic (Mass.kilograms 1190))
-        |> Body.moveTo offset
-        |> (\body ->
-                case player.team of
-                    Orange ->
-                        Body.rotateAround Axis3d.z (Angle.degrees 180) body
-
-                    _ ->
-                        body
-           )
 
 
 ballSettings : { radius : Length }
