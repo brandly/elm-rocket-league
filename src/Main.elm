@@ -215,6 +215,7 @@ type alias Controls =
     }
 
 
+boostSettings : { reloadTime : Float, initial : Float, max : Float, refill : Float }
 boostSettings =
     { reloadTime = 10000
     , initial = 45
@@ -258,6 +259,7 @@ type Command
     | TogglePause
 
 
+commandToString : Command -> String
 commandToString cmd =
     case cmd of
         Jump ->
@@ -393,6 +395,7 @@ init _ =
     )
 
 
+simulationStep : Duration
 simulationStep =
     Duration.seconds (1 / 60)
 
@@ -443,13 +446,13 @@ update msg model =
         ( Menu _ config, StartGame ) ->
             ( { model | screen = Playing (initGame config) config }, Cmd.none )
 
-        ( Menu world config, Tick tick ) ->
+        ( Menu world config, Tick _ ) ->
             ( { model | screen = Menu (world |> World.simulate simulationStep) config }, Cmd.none )
 
         ( Menu _ _, _ ) ->
             ( model, Cmd.none )
 
-        ( Playing game config, Tick tick ) ->
+        ( Playing _ config, Tick tick ) ->
             ( updateGame config tick
                 |> mapGame
             , Cmd.none
@@ -597,7 +600,7 @@ updateGame config tick game =
                 { game
                     | world =
                         game.world
-                            |> World.update (updateBody False game tick)
+                            |> World.update (updateBody False game)
                             |> World.simulate simulationStep
                     , lastTick = currentTick
                 }
@@ -616,7 +619,7 @@ updateGame config tick game =
                 { game
                     | world =
                         game.world
-                            |> World.update (updateBody True game tick)
+                            |> World.update (updateBody True game)
                             |> World.simulate simulationStep
                     , status =
                         Preparing hasCar
@@ -712,7 +715,7 @@ updateGame config tick game =
             { game
                 | world =
                     game.world
-                        |> World.update (updateBody False game tick)
+                        |> World.update (updateBody False game)
                         |> World.simulate simulationStep
                 , players =
                     List.map
@@ -747,8 +750,8 @@ updateGame config tick game =
             }
 
 
-updateBody : Bool -> Game -> Float -> Body Data -> Body Data
-updateBody dry game tick body =
+updateBody : Bool -> Game -> Body Data -> Body Data
+updateBody dry game body =
     case (Body.data body).id of
         Car playerId wheels ->
             let
@@ -920,14 +923,6 @@ keyDecoder (Keyboard controlDict) toMsg =
 
 view : Model -> Html Msg
 view model =
-    let
-        controls =
-            [ ( "Drive", "Arrow keys" )
-            , ( "Boost", "Shift" )
-            , ( "Toggle Camera", "C" )
-            , ( "Jump (buggy)", "Spacebar" )
-            ]
-    in
     Html.div [ Html.Attributes.class "container" ]
         (case model.screen of
             Loading ->
@@ -986,7 +981,7 @@ view model =
                     , Html.div [ Html.Attributes.style "display" "flex" ]
                         (config.drivers
                             |> List.indexedMap
-                                (\index ( driver, team ) ->
+                                (\index ( driver, _ ) ->
                                     case driver of
                                         Keyboard controlDict ->
                                             Html.div
@@ -1090,7 +1085,7 @@ view model =
                                , message
                                ]
 
-                    [ p1, p2 ] ->
+                    [ _, _ ] ->
                         let
                             screenSize =
                                 { width = model.screenSize.width / 2
@@ -1123,6 +1118,16 @@ view model =
         )
 
 
+type alias RadioProps msg =
+    { group : String
+    , value : String
+    , label : String
+    , checked : Bool
+    , onCheck : Bool -> msg
+    }
+
+
+radio : RadioProps msg -> Html msg
 radio { group, value, label, checked, onCheck } =
     let
         id =
@@ -1143,7 +1148,7 @@ radio { group, value, label, checked, onCheck } =
 
 
 viewPlayer : ScreenSize -> Player -> Game -> List (Scene3d.Entity WorldCoordinates) -> List (Html Msg)
-viewPlayer { width, height } player { world, refills, lastTick, score, status } commonEntities =
+viewPlayer { width, height } player { world } commonEntities =
     let
         car =
             world
@@ -1298,6 +1303,7 @@ viewPlayer { width, height } player { world, refills, lastTick, score, status } 
     ]
 
 
+sunlight : Light.Light coordinates Bool
 sunlight =
     Light.directional (Light.castsShadows True)
         { chromaticity = Light.sunlight
@@ -1306,6 +1312,7 @@ sunlight =
         }
 
 
+daylight : Light.Light coordinates Never
 daylight =
     Light.overhead
         { upDirection = Direction3d.z
@@ -1930,6 +1937,7 @@ base player =
            )
 
 
+ballSettings : { radius : Length }
 ballSettings =
     { radius = Length.meters 2
     }
