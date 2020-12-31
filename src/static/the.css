@@ -14,6 +14,7 @@ html {
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
   background: #666;
+  color: #fff;
 }
 
 p {
@@ -36,7 +37,6 @@ h1 {
   top: 0;
   left: 0;
   padding: 24px;
-  color: #fff;
   text-shadow: -2px 2px 2px rgb(0 0 0 / 50%);
   display: flex;
   justify-content: space-between;
@@ -45,7 +45,6 @@ h1 {
 
 .hud-pane {
   background-color: rgba(0,0,0, 0.5);
-  color: #FFF;
 }
 
 .hud-bottom-left {
@@ -98,7 +97,6 @@ h1 {
 
 .hud-cam {
   text-transform: uppercase;
-  color: #FFF;
 }
 .hud-cam-indicator {
   color: red;
@@ -126,13 +124,13 @@ h1 {
 }
 
 .btn-primary {
+  color: inherit;
   cursor: pointer;
   border: none;
   margin: 0;
   padding: 12px 18px;
   border-radius: 4px;
   background: var(--blue);
-  color: #FFF;
   font-weight: bold;
   font-size: 16px;
 }
