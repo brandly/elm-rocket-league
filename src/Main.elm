@@ -2050,8 +2050,7 @@ floor texture =
     in
     Body.plane
         { id = Obstacle
-        , --entity = Scene3d.group entities
-          entity =
+        , entity =
             Scene3d.quad texturedMaterial
                 (point -half -half)
                 (point -half half)
@@ -2102,30 +2101,30 @@ panels =
         buildGoal =
             List.concat
                 [ --left wall
-                  buildPanel Both ((roomSize.width / 2) - (goalSize.width / 2)) roomSize.height
+                  buildWall Block Both ((roomSize.width / 2) - (goalSize.width / 2)) roomSize.height
                     |> List.map (Body.translateBy (Vector3d.meters 0 ((roomSize.width / 4) + (goalSize.width / 4)) 0))
 
                 --right wall
-                , buildPanel Both ((roomSize.width / 2) - (goalSize.width / 2)) roomSize.height
+                , buildWall Block Both ((roomSize.width / 2) - (goalSize.width / 2)) roomSize.height
                     |> List.map (Body.translateBy (Vector3d.meters 0 (-(roomSize.width / 4) - (goalSize.width / 4)) 0))
 
                 -- above goal
-                , buildPanel Top goalSize.width (roomSize.height - goalSize.height)
+                , buildWall Block Top goalSize.width (roomSize.height - goalSize.height)
                     |> List.map (Body.translateBy (Vector3d.meters 0 0 goalSize.height))
 
                 -- back of goal
-                , buildPanel Both goalSize.width goalSize.height
+                , buildWall Plane Both goalSize.width goalSize.height
                     |> List.map (Body.translateBy (Vector3d.meters -goalSize.depth 0 0))
                 , [ --goal sides
-                    buildPlane goalSize.depth goalSize.height
+                    buildPanel Block goalSize.depth goalSize.height
                         |> Body.translateBy (Vector3d.meters (-goalSize.width / 2) (goalSize.depth / 2) (goalSize.height / 2))
                         |> Body.rotateAround Axis3d.z (Angle.degrees 90)
-                  , buildPlane goalSize.depth goalSize.height
+                  , buildPanel Block goalSize.depth goalSize.height
                         |> Body.translateBy (Vector3d.meters (-goalSize.width / 2) (-goalSize.depth / 2) (goalSize.height / 2))
                         |> Body.rotateAround Axis3d.z (Angle.degrees -90)
 
                   -- goal ceiling
-                  , buildPlane goalSize.width goalSize.depth
+                  , buildPanel Block goalSize.width goalSize.depth
                         |> Body.translateBy (Vector3d.meters -goalSize.height 0 (-goalSize.depth / 2))
                         |> Body.rotateAround Axis3d.y (Angle.degrees 90)
                   ]
@@ -2143,50 +2142,69 @@ panels =
           buildGoal
             |> List.map (Body.rotateAround Axis3d.z (Angle.degrees 180))
             |> List.map (Body.translateBy (Vector3d.meters (roomSize.length / 2) 0 0))
-        , buildPanel Both cornerWallLength roomSize.height
+        , buildWall Plane Both cornerWallLength roomSize.height
             |> List.map (Body.rotateAround Axis3d.z (Angle.degrees (180 - 45)))
             |> List.map (Body.translateBy (Vector3d.meters (roomSize.length / 2 - cornerWallDistance) (-roomSize.width / 2 + cornerWallDistance) 0))
 
         -- right
-        , buildPanel Both roomSize.length roomSize.height
+        , buildWall Plane Both roomSize.length roomSize.height
             |> List.map (Body.rotateAround Axis3d.z (Angle.degrees 90))
             |> List.map (Body.translateBy (Vector3d.meters 0 (-roomSize.width / 2) 0))
-        , buildPanel Both cornerWallLength roomSize.height
+        , buildWall Plane Both cornerWallLength roomSize.height
             |> List.map (Body.rotateAround Axis3d.z (Angle.degrees 45))
             |> List.map (Body.translateBy (Vector3d.meters (-roomSize.length / 2 + cornerWallDistance) (-roomSize.width / 2 + cornerWallDistance) 0))
 
         --back
         , buildGoal
             |> List.map (Body.translateBy (Vector3d.meters (-roomSize.length / 2) 0 0))
-        , buildPanel Both cornerWallLength roomSize.height
+        , buildWall Plane Both cornerWallLength roomSize.height
             |> List.map (Body.rotateAround Axis3d.z (Angle.degrees -45))
             |> List.map (Body.translateBy (Vector3d.meters (-roomSize.length / 2 + cornerWallDistance) (roomSize.width / 2 - cornerWallDistance) 0))
 
         -- left
-        , buildPanel Both roomSize.length roomSize.height
+        , buildWall Plane Both roomSize.length roomSize.height
             |> List.map (Body.rotateAround Axis3d.z (Angle.degrees -90))
             |> List.map (Body.translateBy (Vector3d.meters 0 (roomSize.width / 2) 0))
-        , buildPanel Both cornerWallLength roomSize.height
+        , buildWall Plane Both cornerWallLength roomSize.height
             |> List.map (Body.rotateAround Axis3d.z (Angle.degrees (-180 + 45)))
             |> List.map (Body.translateBy (Vector3d.meters (roomSize.length / 2 - cornerWallDistance) (roomSize.width / 2 - cornerWallDistance) 0))
         ]
 
 
-buildPlane : Float -> Float -> Body Data
-buildPlane w h =
+buildPanel : Panel -> Float -> Float -> Body Data
+buildPanel panel w h =
     let
-        block =
-            Block3d.centeredOn Frame3d.atOrigin
-                ( meters h, meters w, meters 0.1 )
+        material =
+            Material.uniform Materials.chromium
     in
-    Body.block block
-        { id = Obstacle
-        , entity =
-            Scene3d.block
-                (Material.uniform Materials.chromium)
-                block
-        }
-        |> Body.rotateAround Axis3d.y (Angle.degrees 90)
+    case panel of
+        Block ->
+            let
+                block =
+                    Block3d.centeredOn Frame3d.atOrigin
+                        ( meters h, meters w, meters 0.1 )
+            in
+            Body.block block
+                { id = Obstacle
+                , entity = Scene3d.block material block
+                }
+                |> Body.rotateAround Axis3d.y (Angle.degrees 90)
+
+        Plane ->
+            let
+                point x y =
+                    Point3d.meters x y 0
+            in
+            Body.plane
+                { id = Obstacle
+                , entity =
+                    Scene3d.quad material
+                        (point (-h / 2) (-w / 2))
+                        (point (-h / 2) (w / 2))
+                        (point (h / 2) (w / 2))
+                        (point (h / 2) (-w / 2))
+                }
+                |> Body.rotateAround Axis3d.y (Angle.degrees 90)
 
 
 type Slope
@@ -2196,14 +2214,19 @@ type Slope
     | Neither
 
 
-buildPanel : Slope -> Float -> Float -> List (Body Data)
-buildPanel type_ width height =
+type Panel
+    = Plane
+    | Block
+
+
+buildWall : Panel -> Slope -> Float -> Float -> List (Body Data)
+buildWall panel type_ width height =
     -- A wall with ramp(s)
     let
         -- TODO: Body.compound, Scene3d.group
         --
         wall =
-            buildPlane width height
+            buildPanel panel width height
                 |> Body.translateBy (Vector3d.meters 0 0 (height / 2))
 
         ( slopeRadius, stepCount ) =
@@ -2224,7 +2247,7 @@ buildPanel type_ width height =
                                     0
                                     -(sin (degrees angle) * slopeRadius)
                         in
-                        buildPlane width 2
+                        buildPanel panel width 2
                             |> Body.translateBy
                                 (Vector3d.meters slopeRadius 0 slopeRadius)
                             |> (\body ->
