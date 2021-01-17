@@ -517,29 +517,29 @@ update msg model =
                     ( model, Cmd.none )
 
                 Rocket ->
-                    ( mapControls playerId (\c -> { c | rockets = False }), Cmd.none )
+                    ( mapControls playerId (\controls -> { controls | rockets = False }), Cmd.none )
 
                 Steer k ->
                     let
-                        steering c =
-                            if k == c.steering then
+                        updateSteering controls =
+                            if k == controls.steering then
                                 0
 
                             else
-                                c.steering
+                                controls.steering
                     in
-                    ( mapControls playerId (\c -> { c | steering = steering c }), Cmd.none )
+                    ( mapControls playerId (\controls -> { controls | steering = updateSteering controls }), Cmd.none )
 
                 Speed k ->
                     let
-                        speeding c =
-                            if k == c.speeding then
+                        updateSpeeding controls =
+                            if k == controls.speeding then
                                 0
 
                             else
-                                c.speeding
+                                controls.speeding
                     in
-                    ( mapControls playerId (\c -> { c | speeding = speeding c }), Cmd.none )
+                    ( mapControls playerId (\controls -> { controls | speeding = updateSpeeding controls }), Cmd.none )
 
                 ToggleCam ->
                     ( model, Cmd.none )
