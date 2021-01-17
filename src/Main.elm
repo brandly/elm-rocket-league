@@ -2173,9 +2173,22 @@ panels =
 
 buildPanel : Panel -> Float -> Float -> Body Data
 buildPanel panel w h =
+    -- We really only need planes everywhere, but in the physics engine, planes extend forever.
+    -- Blocks are needed only as partial planes, so we will draw a quad but put a thin block
+    -- in the physics simulation.
     let
         material =
             Material.uniform Materials.chromium
+
+        point x y =
+            Point3d.meters x y 0
+
+        quad =
+            Scene3d.quad material
+                (point (-h / 2) (-w / 2))
+                (point (-h / 2) (w / 2))
+                (point (h / 2) (w / 2))
+                (point (h / 2) (-w / 2))
     in
     case panel of
         Block ->
@@ -2186,23 +2199,14 @@ buildPanel panel w h =
             in
             Body.block block
                 { id = Obstacle
-                , entity = Scene3d.block material block
+                , entity = quad
                 }
                 |> Body.rotateAround Axis3d.y (Angle.degrees 90)
 
         Plane ->
-            let
-                point x y =
-                    Point3d.meters x y 0
-            in
             Body.plane
                 { id = Obstacle
-                , entity =
-                    Scene3d.quad material
-                        (point (-h / 2) (-w / 2))
-                        (point (-h / 2) (w / 2))
-                        (point (h / 2) (w / 2))
-                        (point (h / 2) (-w / 2))
+                , entity = quad
                 }
                 |> Body.rotateAround Axis3d.y (Angle.degrees 90)
 
