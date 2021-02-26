@@ -204,7 +204,13 @@ type alias Player =
     , controls : Controls
     , boostTank : Float
     , focus : CameraFocus
+    , air : AirState
     }
+
+
+type AirState
+    = OnGround
+    | InAir
 
 
 type alias Controls =
@@ -830,6 +836,7 @@ toPlayer =
         , controls = initControls
         , boostTank = boostSettings.initial
         , focus = BallCam
+        , air = InAir
         }
 
 
@@ -1482,6 +1489,27 @@ createMenuWorld config =
         )
         world_
         players
+
+
+isOnGround : List Wheel -> Bool
+isOnGround wheels =
+    List.map .contact wheels
+        |> List.any
+            -- Maybe.isJust
+            (\c ->
+                case c of
+                    Just _ ->
+                        True
+
+                    _ ->
+                        False
+            )
+
+
+
+-- Hmmm maybe CarControls is its own thing. There's a mapping between player controls and car controls,
+-- but for instance "down" should brake if the car is moving forward, reverse if not, and change the
+-- if `not << isOnGround`. Not sure what's best yet.
 
 
 simulateCar : Duration -> World Data -> Controls -> List Wheel -> Body Data -> Body Data
