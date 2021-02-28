@@ -44,15 +44,13 @@ import WebGL.Texture
 
 
 type alias Data =
-    { entity : Scene3d.Entity BodyCoordinates
-    , id : EntityId
-    }
+    EntityId
 
 
 type EntityId
     = Car PlayerId (List Wheel)
     | Ball
-    | Obstacle
+    | Obstacle Panel
 
 
 isBall : EntityId -> Bool
@@ -310,6 +308,7 @@ type alias CarSettings =
     , rollInfluence : Float
     , maxSuspensionForce : Force
     , customSlidingRotationalSpeed : Maybe Float
+    , size : ( Length, Length, Length )
     }
 
 
@@ -329,6 +328,7 @@ carSettings =
     , rollInfluence = 0.01
     , maxSuspensionForce = Force.newtons 100000
     , customSlidingRotationalSpeed = Just -30
+    , size = ( Length.meters 2.8, Length.meters 2, Length.meters 0.5 )
     }
 
 
@@ -670,7 +670,7 @@ updateGame config tick game =
                 ballPoint =
                     game.world
                         |> World.bodies
-                        |> List.filter (Body.data >> .id >> isBall)
+                        |> List.filter (Body.data >> isBall)
                         |> List.head
                         |> Maybe.map Body.originPoint
                         |> Maybe.withDefault (Point3d.meters 0 0 0)
@@ -681,7 +681,7 @@ updateGame config tick game =
                         |> World.bodies
                         |> List.filterMap
                             (\car ->
-                                case ( (Body.data car).id, List.head game.players ) of
+                                case ( Body.data car, List.head game.players ) of
                                     ( Car playerId _, Just somePlayer ) ->
                                         Just
                                             ( game.players
@@ -784,7 +784,7 @@ updateGame config tick game =
 
 updateBody : Bool -> List Player -> World Data -> Body Data -> Body Data
 updateBody dry players world body =
-    case (Body.data body).id of
+    case Body.data body of
         Car playerId wheels ->
             let
                 maybePlayer =
@@ -837,7 +837,8 @@ initGame : Config -> Game
 initGame config =
     { world =
         initialWorld
-            |> World.add (floor config.texture)
+
+    --|> World.add (floor config.texture)
     , players = List.indexedMap toPlayer config.drivers
     , lastTick = 0
     , refills =
@@ -865,7 +866,7 @@ applyJump playerId body =
     -- TODO: restrict to double jump
     -- TODO: raycast to see if on ground
     -- TODO: handle arrow directions
-    case (Body.data body).id of
+    case Body.data body of
         Car carPlayerId _ ->
             if playerId == carPlayerId then
                 body
@@ -969,10 +970,10 @@ view model =
                     wheelEntities =
                         world
                             |> World.bodies
-                            |> List.filter (Body.data >> .id >> isCar)
+                            |> List.filter (Body.data >> isCar)
                             |> List.map
                                 (\car_ ->
-                                    case (Body.data >> .id) car_ of
+                                    case Body.data car_ of
                                         Car _ wheels ->
                                             renderWheels car_ wheels
 
@@ -1003,7 +1004,7 @@ view model =
                     , entities =
                         world
                             |> World.bodies
-                            |> List.map getTransformedDrawable
+                            |> List.map (viewEntity (List.indexedMap toPlayer config.drivers))
                             |> (++) wheelEntities
                     }
                 , Html.div [ Html.Attributes.class "menu" ]
@@ -1067,7 +1068,6 @@ view model =
                 ]
 
             Playing game _ ->
-                -- TODO: loop over (human) players, split screen as needed
                 let
                     humans =
                         game.players
@@ -1108,14 +1108,15 @@ view model =
                             _ ->
                                 Html.text ""
 
+                    commonEntities : List (Scene3d.Entity WorldCoordinates)
                     commonEntities =
                         List.concat
                             [ game.world
                                 |> World.bodies
-                                |> List.filter (Body.data >> .id >> isCar)
+                                |> List.filter (Body.data >> isCar)
                                 |> List.map
                                     (\car_ ->
-                                        case (Body.data >> .id) car_ of
+                                        case Body.data car_ of
                                             Car _ wheels ->
                                                 renderWheels car_ wheels
 
@@ -1200,12 +1201,12 @@ radio { group, value, label, checked, onCheck } =
 
 
 viewPlayer : ScreenSize -> Player -> Game -> List (Scene3d.Entity WorldCoordinates) -> List (Html Msg)
-viewPlayer { width, height } player { world } commonEntities =
+viewPlayer { width, height } player { world, players } commonEntities =
     let
         car =
             world
                 |> World.bodies
-                |> List.filter (Body.data >> .id >> isPlayersCar player)
+                |> List.filter (Body.data >> isPlayersCar player)
                 |> List.head
 
         camera =
@@ -1213,7 +1214,7 @@ viewPlayer { width, height } player { world } commonEntities =
                 ballBody =
                     world
                         |> World.bodies
-                        |> List.filter (Body.data >> .id >> isBall)
+                        |> List.filter (Body.data >> isBall)
                         |> List.head
 
                 frameOrigin =
@@ -1290,8 +1291,8 @@ viewPlayer { width, height } player { world } commonEntities =
                         |> World.bodies
                         |> List.filter
                             (\body ->
-                                case (Body.data body).id of
-                                    Obstacle ->
+                                case Body.data body of
+                                    Obstacle _ ->
                                         let
                                             eyePoint =
                                                 Viewpoint3d.eyePoint (Camera3d.viewpoint camera)
@@ -1305,7 +1306,7 @@ viewPlayer { width, height } player { world } commonEntities =
                                     _ ->
                                         True
                             )
-                        |> List.map getTransformedDrawable
+                        |> List.map (viewEntity players)
                    )
     in
     [ Scene3d.custom
@@ -1529,7 +1530,20 @@ updateSuspension dt world frame originalCar currentWheels updatedCar updatedWhee
                     Axis3d.through wheel.chassisConnectionPoint carSettings.downDirection
                         |> Axis3d.placeIn frame
             in
-            case World.raycast ray (World.keepIf (\b -> (Body.data b).id == Obstacle) world) of
+            case
+                World.raycast ray
+                    (World.keepIf
+                        (\b ->
+                            case Body.data b of
+                                Obstacle _ ->
+                                    True
+
+                                _ ->
+                                    False
+                        )
+                        world
+                    )
+            of
                 Just { body, normal, point } ->
                     let
                         bodyFrame =
@@ -1814,12 +1828,10 @@ applyImpulses dt world frame car wheels sliding wheelFrictions =
 
 rotateWheels : Duration -> Frame3d Meters WorldCoordinates { defines : BodyCoordinates } -> Body Data -> List Wheel -> List Wheel -> Body Data
 rotateWheels dt frame car wheels updatedWheels =
-    case ( wheels, (Body.data car).id ) of
+    case ( wheels, Body.data car ) of
         ( [], Car playerId _ ) ->
             Body.withData
-                { id = Car playerId (List.reverse updatedWheels)
-                , entity = (Body.data car).entity
-                }
+                (Car playerId (List.reverse updatedWheels))
                 car
 
         ( [], _ ) ->
@@ -1960,37 +1972,8 @@ createCar : Player -> Body Data
 createCar player =
     -- TODO: better car shape
     let
-        size =
-            ( Length.meters 2.8, Length.meters 2, Length.meters 0.5 )
-
         shape =
-            Block3d.centeredOn Frame3d.atOrigin size
-
-        material =
-            Material.nonmetal
-                { baseColor = teamColor player.team
-                , roughness = 0.5
-                }
-
-        entity =
-            Scene3d.group
-                [ Scene3d.blockWithShadow material
-                    (Block3d.centeredOn Frame3d.atOrigin size)
-                , Scene3d.block material
-                    (Block3d.centeredOn
-                        (Frame3d.atOrigin
-                            |> Frame3d.translateBy
-                                (Vector3d.withLength (Length.meters 0.5)
-                                    (Frame3d.zDirection Frame3d.atOrigin)
-                                )
-                            |> Frame3d.translateBy
-                                (Vector3d.withLength (Length.meters -0.3)
-                                    (Frame3d.xDirection Frame3d.atOrigin)
-                                )
-                        )
-                        ( Length.meters 2.2, Length.meters 1.8, Length.meters 0.5 )
-                    )
-                ]
+            Block3d.centeredOn Frame3d.atOrigin carSettings.size
 
         wheels =
             [ { defaultWheel | chassisConnectionPoint = Point3d.meters 1 1 0 }
@@ -1999,9 +1982,7 @@ createCar player =
             , { defaultWheel | chassisConnectionPoint = Point3d.meters -1 -1 0 }
             ]
     in
-    { id = Car player.id wheels
-    , entity = entity
-    }
+    Car player.id wheels
         |> Body.block shape
         |> Body.withBehavior (Body.dynamic (Mass.kilograms 1190))
 
@@ -2017,13 +1998,8 @@ ball =
     let
         shape =
             Sphere3d.atOrigin ballSettings.radius
-
-        entity =
-            Scene3d.sphereWithShadow (Material.uniform Materials.chromium) shape
     in
-    { id = Ball
-    , entity = entity
-    }
+    Ball
         |> Body.sphere shape
         |> Body.withMaterial (Physics.Material.custom { friction = 0.3, bounciness = 0.8 })
         |> Body.withBehavior (Body.dynamic (Mass.kilograms 1))
@@ -2033,30 +2009,13 @@ ball =
 floor : Material.Texture Color -> Body Data
 floor texture =
     let
-        point x y =
-            Point3d.meters x y 0
-
         texturedMaterial =
             Material.texturedNonmetal
                 { baseColor = texture
                 , roughness = Material.constant 0.25
                 }
-
-        length =
-            180
-
-        half =
-            length / 2
     in
-    Body.plane
-        { id = Obstacle
-        , entity =
-            Scene3d.quad texturedMaterial
-                (point -half -half)
-                (point -half half)
-                (point half half)
-                (point half -half)
-        }
+    Body.plane (Obstacle Plane)
 
 
 ceiling : Body Data
@@ -2068,24 +2027,19 @@ ceiling =
         half =
             roomSize.length / 2
     in
-    Body.plane
-        { id = Obstacle
-        , entity =
-            Scene3d.quad (Material.uniform Materials.chromium)
-                (point -half -half)
-                (point -half half)
-                (point half half)
-                (point half -half)
-        }
+    Body.plane (Obstacle Plane)
         |> Body.rotateAround Axis3d.x (Angle.degrees 180)
         |> Body.translateBy (Vector3d.meters 0 0 roomSize.height)
 
 
-roomSize : { width : Float, length : Float, height : Float }
+roomSize : { width : Float, length : Float, height : Float, floorLength : Float }
 roomSize =
     { width = 131
     , length = 161
     , height = 40
+
+    -- due to texture size...
+    , floorLength = 180
     }
 
 
@@ -2197,17 +2151,11 @@ buildPanel panel w h =
                     Block3d.centeredOn Frame3d.atOrigin
                         ( meters h, meters w, meters 0.1 )
             in
-            Body.block block
-                { id = Obstacle
-                , entity = quad
-                }
+            Body.block block (Obstacle Block)
                 |> Body.rotateAround Axis3d.y (Angle.degrees 90)
 
         Plane ->
-            Body.plane
-                { id = Obstacle
-                , entity = quad
-                }
+            Body.plane (Obstacle Plane)
                 |> Body.rotateAround Axis3d.y (Angle.degrees 90)
 
 
@@ -2290,6 +2238,72 @@ buildWall panel type_ width height =
             [ wall ]
 
 
-getTransformedDrawable : Body Data -> Scene3d.Entity WorldCoordinates
-getTransformedDrawable body =
-    Scene3d.placeIn (Body.frame body) (Body.data body).entity
+viewEntity : List Player -> Body Data -> Scene3d.Entity WorldCoordinates
+viewEntity players body =
+    let
+        entityId =
+            Body.data body
+
+        entity =
+            case entityId of
+                Car playerId _ ->
+                    let
+                        color =
+                            players
+                                |> List.filter (.id >> (==) playerId)
+                                |> List.head
+                                |> Maybe.map (.team >> teamColor)
+                                |> Maybe.withDefault (Color.rgb255 0 0 0)
+
+                        material =
+                            Material.nonmetal
+                                { baseColor = color
+                                , roughness = 0.5
+                                }
+                    in
+                    Scene3d.group
+                        [ Scene3d.blockWithShadow material
+                            (Block3d.centeredOn Frame3d.atOrigin carSettings.size)
+                        , Scene3d.block material
+                            (Block3d.centeredOn
+                                (Frame3d.atOrigin
+                                    |> Frame3d.translateBy
+                                        (Vector3d.withLength (Length.meters 0.5)
+                                            (Frame3d.zDirection Frame3d.atOrigin)
+                                        )
+                                    |> Frame3d.translateBy
+                                        (Vector3d.withLength (Length.meters -0.3)
+                                            (Frame3d.xDirection Frame3d.atOrigin)
+                                        )
+                                )
+                                ( Length.meters 2.2, Length.meters 1.8, Length.meters 0.5 )
+                            )
+                        ]
+
+                Ball ->
+                    let
+                        shape =
+                            Sphere3d.atOrigin ballSettings.radius
+                    in
+                    Scene3d.sphereWithShadow (Material.uniform Materials.chromium) shape
+
+                Obstacle panel ->
+                    case panel of
+                        Block ->
+                            Debug.todo "figure out how to determine block size, maybe need to track in Block"
+
+                        Plane ->
+                            let
+                                half =
+                                    roomSize.floorLength / 2
+
+                                point x y =
+                                    Point3d.meters x y 0
+                            in
+                            Scene3d.quad (Material.uniform Materials.chromium)
+                                (point -half -half)
+                                (point -half half)
+                                (point half half)
+                                (point half -half)
+    in
+    Scene3d.placeIn (Body.frame body) entity
