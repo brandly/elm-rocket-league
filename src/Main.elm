@@ -3,7 +3,7 @@ module Main exposing (main)
 import Acceleration
 import Angle exposing (Angle)
 import Axis3d
-import Block3d
+import Block3d exposing (Block3d)
 import Browser
 import Browser.Dom as Dom
 import Browser.Events as Events
@@ -50,7 +50,7 @@ type alias Data =
 type EntityId
     = Car PlayerId (List Wheel)
     | Ball
-    | Obstacle Panel
+    | Obstacle Panel (Block3d Meters WorldCoordinates)
 
 
 isBall : EntityId -> Bool
@@ -1292,7 +1292,7 @@ viewPlayer { width, height } player { world, players } commonEntities =
                         |> List.filter
                             (\body ->
                                 case Body.data body of
-                                    Obstacle _ ->
+                                    Obstacle _ _ ->
                                         let
                                             eyePoint =
                                                 Viewpoint3d.eyePoint (Camera3d.viewpoint camera)
@@ -1535,7 +1535,7 @@ updateSuspension dt world frame originalCar currentWheels updatedCar updatedWhee
                     (World.keepIf
                         (\b ->
                             case Body.data b of
-                                Obstacle _ ->
+                                Obstacle _ _ ->
                                     True
 
                                 _ ->
@@ -2287,7 +2287,7 @@ viewEntity players body =
                     in
                     Scene3d.sphereWithShadow (Material.uniform Materials.chromium) shape
 
-                Obstacle panel ->
+                Obstacle panel geometry ->
                     case panel of
                         Block ->
                             Debug.todo "figure out how to determine block size, maybe need to track in Block"
